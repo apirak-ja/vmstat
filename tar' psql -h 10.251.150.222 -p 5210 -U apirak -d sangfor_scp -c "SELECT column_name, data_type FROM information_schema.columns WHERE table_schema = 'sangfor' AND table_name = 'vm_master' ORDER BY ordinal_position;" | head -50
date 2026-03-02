@@ -1,0 +1,84 @@
+                                     Table "sangfor.vm_master"
+        Column        |           Type           | Collation | Nullable |         Default          
+----------------------+--------------------------+-----------+----------+--------------------------
+ vm_uuid              | uuid                     |           | not null | 
+ vm_id                | bigint                   |           |          | 
+ name                 | character varying(200)   |           | not null | 
+ vmtype               | character varying(20)    |           |          | 
+ platform_type        | character varying(20)    |           |          | 'hci'::character varying
+ az_id                | uuid                     |           |          | 
+ host_id              | character varying(50)    |           |          | 
+ group_id             | uuid                     |           |          | 
+ storage_id           | character varying(50)    |           |          | 
+ project_id           | character varying(50)    |           |          | 
+ project_name         | character varying(100)   |           |          | 
+ user_id              | character varying(50)    |           |          | 
+ user_name            | character varying(100)   |           |          | 
+ os_type              | character varying(100)   |           |          | 
+ os_name              | character varying(100)   |           |          | 
+ os_installed         | smallint                 |           |          | 
+ os_arch              | character varying(20)    |           |          | 
+ os_kernel            | character varying(50)    |           |          | 
+ os_distribution      | character varying(100)   |           |          | 
+ cpu_sockets          | smallint                 |           |          | 
+ cpu_cores            | smallint                 |           |          | 
+ cpu_cores_per_socket | smallint                 |           |          | 
+ cpu_total_mhz        | numeric(12,2)            |           |          | 
+ memory_total_mb      | numeric(12,2)            |           |          | 
+ storage_total_mb     | numeric(15,2)            |           |          | 
+ has_gpu              | boolean                  |           |          | false
+ gpu_conf             | jsonb                    |           |          | 
+ vtool_installed      | boolean                  |           |          | false
+ encrypted            | boolean                  |           |          | false
+ balloon_memory       | boolean                  |           |          | false
+ onboot               | boolean                  |           |          | true
+ abnormal_recovery    | boolean                  |           |          | true
+ vga_type             | character varying(20)    |           |          | 
+ protection_id        | uuid                     |           |          | 
+ protection_enabled   | boolean                  |           |          | false
+ in_protection        | boolean                  |           |          | false
+ backup_policy_enable | boolean                  |           |          | false
+ backup_file_count    | integer                  |           |          | 0
+ template_id          | character varying(50)    |           |          | 
+ image_id             | character varying(50)    |           |          | 
+ image_name           | character varying(200)   |           |          | 
+ expire_time          | character varying(50)    |           |          | 
+ tags                 | text[]                   |           |          | 
+ description          | text                     |           |          | 
+ first_seen_at        | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+ last_seen_at         | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+ config_updated_at    | timestamp with time zone |           |          | CURRENT_TIMESTAMP
+ is_deleted           | boolean                  |           |          | false
+ deleted_at           | timestamp with time zone |           |          | 
+ os_display_name      | character varying(255)   |           |          | 
+ uptime_seconds       | bigint                   |           |          | 
+Indexes:
+    "vm_master_pkey" PRIMARY KEY, btree (vm_uuid)
+    "idx_vm_az" btree (az_id)
+    "idx_vm_deleted" btree (is_deleted) WHERE is_deleted = false
+    "idx_vm_group" btree (group_id)
+    "idx_vm_host" btree (host_id)
+    "idx_vm_last_seen" btree (last_seen_at)
+    "idx_vm_master_az" btree (az_id)
+    "idx_vm_master_deleted" btree (is_deleted)
+    "idx_vm_master_group" btree (group_id)
+    "idx_vm_master_host" btree (host_id)
+    "idx_vm_master_name" btree (name)
+    "idx_vm_name" btree (name)
+    "idx_vm_os" btree (os_type, os_kernel)
+    "idx_vm_project" btree (project_id)
+    "idx_vm_protection" btree (protection_id)
+    "idx_vm_storage" btree (storage_id)
+    "idx_vm_vmid" btree (vm_id)
+    "vm_master_vm_id_key" UNIQUE CONSTRAINT, btree (vm_id)
+Foreign-key constraints:
+    "vm_master_az_id_fkey" FOREIGN KEY (az_id) REFERENCES sangfor.az_master(az_id)
+    "vm_master_group_id_fkey" FOREIGN KEY (group_id) REFERENCES sangfor.vm_group_master(group_id)
+    "vm_master_host_id_fkey" FOREIGN KEY (host_id) REFERENCES sangfor.host_master(host_id)
+    "vm_master_protection_id_fkey" FOREIGN KEY (protection_id) REFERENCES sangfor.protection_master(protection_id)
+Referenced by:
+    TABLE "sangfor.vm_network_interfaces" CONSTRAINT "fk_vm_network_vm" FOREIGN KEY (vm_uuid) REFERENCES sangfor.vm_master(vm_uuid) ON DELETE CASCADE
+    TABLE "sangfor.vm_alarms" CONSTRAINT "vm_alarms_vm_uuid_fkey" FOREIGN KEY (vm_uuid) REFERENCES sangfor.vm_master(vm_uuid) ON DELETE CASCADE
+    TABLE "sangfor.vm_disk_config" CONSTRAINT "vm_disk_config_vm_uuid_fkey" FOREIGN KEY (vm_uuid) REFERENCES sangfor.vm_master(vm_uuid) ON DELETE CASCADE
+    TABLE "sangfor.vm_network_config" CONSTRAINT "vm_network_config_vm_uuid_fkey" FOREIGN KEY (vm_uuid) REFERENCES sangfor.vm_master(vm_uuid) ON DELETE CASCADE
+

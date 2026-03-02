@@ -71,7 +71,7 @@ const colorMap: Record<string, { color: string; gradientFrom: string; gradientTo
     admin_settings: { color: '#6366f1', gradientFrom: '#6366f1', gradientTo: '#4f46e5' },
     admin_sync: { color: '#ec4899', gradientFrom: '#ec4899', gradientTo: '#db2777' },
     profile: { color: '#14b8a6', gradientFrom: '#14b8a6', gradientTo: '#0d9488' },
-    reports: { color: '#06b6d4', gradientFrom: '#06b6d4', gradientTo: '#0891b2' },
+    vmreport: { color: '#06b6d4', gradientFrom: '#06b6d4', gradientTo: '#0891b2' },
 };
 
 const defaultColors = { color: '#64748b', gradientFrom: '#64748b', gradientTo: '#475569' };

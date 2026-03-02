@@ -6,6 +6,8 @@ from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, List
+from pydantic import validator
 
 # Find .env file in project root
 def find_env_file():
@@ -59,12 +61,32 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     
-    # CORS - ระบุ origin ที่อนุญาต คั่นด้วยเครื่องหมายจุลภาคจาก .env (CORS_ORIGINS=https://host1,https://host2)
-    CORS_ORIGINS: str = "https://10.251.150.222:3345"
+    # CORS - ถ้าระบุเป็นสตริงให้คั่นด้วยจุลภาค เช่น CORS_ORIGINS=https://a,https://b
+    #       หรือสามารถกำหนดเป็น JSON list ในตัวแปร environment ได้เลย
+    CORS_ORIGINS: Any = "https://10.251.150.222:3345"
+
+    @validator("CORS_ORIGINS", pre=True)
+    def _parse_cors_origins(cls, v):
+        # Accept comma-separated string or JSON array or list
+        if isinstance(v, str):
+            try:
+                # try parse JSON array
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except Exception:
+                pass
+            # fallback split by comma
+            return [o.strip() for o in v.split(",") if o.strip()]
+        if isinstance(v, list):
+            return v
+        return [v]
 
     @property
     def CORS_ORIGINS_LIST(self) -> list:
-        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        if isinstance(self.CORS_ORIGINS, list):
+            return self.CORS_ORIGINS
+        return [self.CORS_ORIGINS]
     
     # Sangfor SCP API Configuration
     SCP_IP: str = ""

@@ -10,4 +10,6 @@ from .menu_permissions import router as menu_permissions_router
 from .keycloak import router as keycloak_router
 from .admin_vms import router as admin_vms_router
 from .vm_control import router as vm_control_router
-from .reports import router as reports_router
+from .vmreport import router as vmreport_router
+
+

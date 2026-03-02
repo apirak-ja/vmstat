@@ -19,7 +19,7 @@ import UserManagementPage from './pages/UserManagementPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import SyncPage from './pages/SyncPage';
 import ProfilePage from './pages/ProfilePage';
-import ReportsPage from './pages/ReportsPage';
+import VMReportIntelligencePage from './pages/VMReportIntelligencePage';
 import { Box, Typography, Button, alpha } from '@mui/material';
 import { Lock as LockIcon } from '@mui/icons-material';
 import { useIdleTimer } from './hooks/useIdleTimer';
@@ -198,8 +198,8 @@ export default function App() {
                         <PermissionRoute menuPath="/datastores"><DataStoreDetailPage /></PermissionRoute>
                     } />
                     <Route path="/profile" element={<ProfilePage />} />
-                    <Route path="/reports" element={
-                        <PermissionRoute menuPath="/reports"><ReportsPage /></PermissionRoute>
+                    <Route path="/vmreport" element={
+                        <PermissionRoute menuPath="/vmreport"><VMReportIntelligencePage /></PermissionRoute>
                     } />
 
                     {/* Admin routes - permission checked */}
