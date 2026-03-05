@@ -24,19 +24,17 @@ class VMReportService:
         # 1. Snapshot (Basic Info + Current Usage)
         basic_info_query = text("""
             SELECT 
-                vm.vm_uuid,
-                vm.name,
-                vm.power_state,
-                g.group_name,
-                h.host_name,
-                vm.cpu_cores,
-                vm.memory_total_mb,
-                vm.storage_total_mb,
-                vm.os_name
-            FROM sangfor.vm_master vm
-            LEFT JOIN sangfor.vm_group_master g ON vm.group_id = g.group_id
-            LEFT JOIN sangfor.host_master h ON vm.host_id = h.host_id
-            WHERE vm.vm_uuid = CAST(:vm_uuid AS uuid)
+                vm_uuid,
+                name,
+                power_state,
+                group_name,
+                host_name,
+                cpu_cores,
+                memory_total_mb,
+                storage_total_mb,
+                os_name
+            FROM analytics.v_vm_overview
+            WHERE vm_uuid = CAST(:vm_uuid AS uuid)
         """)
         basic_row = db.execute(basic_info_query, {"vm_uuid": vm_uuid}).fetchone()
         
@@ -49,9 +47,9 @@ class VMReportService:
             "power_state": basic_row[2],
             "group_name": basic_row[3],
             "host_name": basic_row[4],
-            "vcpu": basic_row[5],
-            "vram_mb": basic_row[6],
-            "disk_total_gb": round(basic_row[7] / 1024.0, 2) if basic_row[7] else 0,
+            "vcpu": int(basic_row[5]) if basic_row[5] is not None else 0,
+            "vram_mb": float(basic_row[6]) if basic_row[6] is not None else 0,
+            "disk_total_gb": round(float(basic_row[7]) / 1024.0, 2) if basic_row[7] is not None else 0,
             "os_name": basic_row[8]
         }
         
@@ -101,8 +99,8 @@ class VMReportService:
                     AVG(cpu_ratio * 100) as cpu_usage,
                     AVG(memory_ratio * 100) as memory_usage,
                     AVG(storage_ratio * 100) as disk_usage,
-                    AVG(network_in_bytes / 1024.0 / 1024.0) as net_rx,
-                    AVG(network_out_bytes / 1024.0 / 1024.0) as net_tx
+                    AVG(network_read_bitps / 8 / 1024.0 / 1024.0) as net_rx,
+                    AVG(network_write_bitps / 8 / 1024.0 / 1024.0) as net_tx
                 FROM metrics.vm_metrics
                 WHERE vm_uuid = CAST(:vm_uuid AS uuid)
                 AND collected_at >= CAST(:start_date AS timestamp)
