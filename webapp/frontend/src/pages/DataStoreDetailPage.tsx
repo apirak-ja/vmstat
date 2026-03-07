@@ -187,16 +187,18 @@ const DataStoreDetailPage: React.FC = () => {
 
 
     // Prepare chart data
-    const chartData = metrics.map(m => ({
-        ...m,
-        timestamp_raw: m.timestamp, // เก็บ timestamp ดิบไว้สำหรับประมวลผล
-        timestamp: formatChartDate(m.timestamp), // formatted สำหรับแสดงในกราฟ
-        used_gb: m.used_mb / 1024,
-        total_gb: m.total_mb / 1024,
-        free_gb: m.free_mb / 1024,
-        read_mbps: m.read_byteps / (1024 * 1024),
-        write_mbps: m.write_byteps / (1024 * 1024),
-    }));
+    const chartData = useMemo(() => {
+        return metrics.map(m => ({
+            ...m,
+            timestamp_raw: m.timestamp, // เก็บ timestamp ดิบไว้สำหรับประมวลผล
+            timestamp: formatChartDate(m.timestamp), // formatted สำหรับแสดงในกราฟ
+            used_gb: m.used_mb / 1024,
+            total_gb: m.total_mb / 1024,
+            free_gb: m.free_mb / 1024,
+            read_mbps: m.read_byteps / (1024 * 1024),
+            write_mbps: m.write_byteps / (1024 * 1024),
+        }));
+    }, [metrics]);
 
     if (datastoreLoading) {
         return (
@@ -403,10 +405,10 @@ const DataStoreDetailPage: React.FC = () => {
             </Card>
 
             {/* Custom Date Dialog */}
-            <Dialog 
-                open={customDateOpen} 
-                onClose={() => setCustomDateOpen(false)} 
-                maxWidth="sm" 
+            <Dialog
+                open={customDateOpen}
+                onClose={() => setCustomDateOpen(false)}
+                maxWidth="sm"
                 fullWidth
                 fullScreen={isMobile}
             >
@@ -945,7 +947,7 @@ const DataStoreDetailPage: React.FC = () => {
                                 <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ mt: 2, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                                     💾 Storage Usage (GB)
                                 </Typography>
-                                <Box sx={{ height: { xs: 250, sm: 300 }, mb: { xs: 3, sm: 4 } }}>
+                                <Box sx={{ height: { xs: 250, sm: 300 }, mb: { xs: 3, sm: 4 }, overflow: 'hidden' }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <ComposedChart data={chartData}>
                                             <defs>
@@ -973,6 +975,7 @@ const DataStoreDetailPage: React.FC = () => {
                                                 stroke="#ef4444"
                                                 fillOpacity={1}
                                                 fill="url(#colorUsed)"
+                                                isAnimationActive={false}
                                             />
                                             <Area
                                                 type="monotone"
@@ -981,6 +984,7 @@ const DataStoreDetailPage: React.FC = () => {
                                                 stroke="#10b981"
                                                 fillOpacity={1}
                                                 fill="url(#colorFree)"
+                                                isAnimationActive={false}
                                             />
                                         </ComposedChart>
                                     </ResponsiveContainer>
@@ -1223,7 +1227,7 @@ const DataStoreDetailPage: React.FC = () => {
                                 <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                                     ⚡ Throughput (MB/s)
                                 </Typography>
-                                <Box sx={{ height: { xs: 200, sm: 250 }, overflow: 'auto' }}>
+                                <Box sx={{ height: { xs: 200, sm: 250 }, overflowX: 'auto', overflowY: 'hidden' }}>
                                     <ResponsiveContainer width="100%" height="100%" minWidth={300}>
                                         <LineChart data={chartData}>
                                             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -1241,6 +1245,7 @@ const DataStoreDetailPage: React.FC = () => {
                                                 stroke="#3b82f6"
                                                 strokeWidth={2}
                                                 dot={false}
+                                                isAnimationActive={false}
                                             />
                                             <Line
                                                 type="monotone"
@@ -1249,6 +1254,7 @@ const DataStoreDetailPage: React.FC = () => {
                                                 stroke="#f59e0b"
                                                 strokeWidth={2}
                                                 dot={false}
+                                                isAnimationActive={false}
                                             />
                                         </LineChart>
                                     </ResponsiveContainer>
@@ -1372,7 +1378,7 @@ const DataStoreDetailPage: React.FC = () => {
                                 <Typography variant="h6" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                                     📈 Growth Trend & Forecast
                                 </Typography>
-                                <Box sx={{ height: { xs: 250, sm: 300, md: 350 } }}>
+                                <Box sx={{ height: { xs: 250, sm: 300, md: 350 }, overflow: 'hidden' }}>
                                     {analyticsLoading ? (
                                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                                             <CircularProgress />
@@ -1392,8 +1398,8 @@ const DataStoreDetailPage: React.FC = () => {
                                                     formatter={(v: number) => [`${v.toFixed(2)} MB`]}
                                                 />
                                                 <Legend />
-                                                <Area type="monotone" dataKey="actual_used_mb" name="Actual Usage" fill="#3b82f6" stroke="#3b82f6" fillOpacity={0.2} />
-                                                <Line type="monotone" dataKey="trend_used_mb" name="Trend Line" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+                                                <Area type="monotone" dataKey="actual_used_mb" name="Actual Usage" fill="#3b82f6" stroke="#3b82f6" fillOpacity={0.2} isAnimationActive={false} />
+                                                <Line type="monotone" dataKey="trend_used_mb" name="Trend Line" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="5 5" isAnimationActive={false} />
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     )}
@@ -2179,7 +2185,7 @@ const AIPredictionTab: React.FC<AIPredictionTabProps> = ({ aiPrediction, aiLoadi
                             </Button>
                         </Box>
 
-                        <Box sx={{ height: { xs: 280, sm: 320, md: 400 }, overflow: 'auto' }}>
+                        <Box sx={{ height: { xs: 280, sm: 320, md: 400 }, overflowX: 'auto', overflowY: 'hidden' }}>
                             <ResponsiveContainer width="100%" height="100%" minWidth={300}>
                                 <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -2206,6 +2212,7 @@ const AIPredictionTab: React.FC<AIPredictionTabProps> = ({ aiPrediction, aiLoadi
                                         fill="#8b5cf6"
                                         fillOpacity={0.1}
                                         name="ช่วงความเชื่อมั่น (Upper)"
+                                        isAnimationActive={false}
                                     />
                                     <Area
                                         type="monotone"
@@ -2214,6 +2221,7 @@ const AIPredictionTab: React.FC<AIPredictionTabProps> = ({ aiPrediction, aiLoadi
                                         fill="#ffffff"
                                         fillOpacity={1}
                                         name="ช่วงความเชื่อมั่น (Lower)"
+                                        isAnimationActive={false}
                                     />
 
                                     {/* Actual Data */}
@@ -2225,6 +2233,7 @@ const AIPredictionTab: React.FC<AIPredictionTabProps> = ({ aiPrediction, aiLoadi
                                         dot={{ fill: '#3b82f6', r: 3 }}
                                         name="ข้อมูลจริง"
                                         connectNulls
+                                        isAnimationActive={false}
                                     />
 
                                     {/* Forecast Line */}
@@ -2236,6 +2245,7 @@ const AIPredictionTab: React.FC<AIPredictionTabProps> = ({ aiPrediction, aiLoadi
                                         strokeDasharray="5 5"
                                         dot={false}
                                         name="พยากรณ์"
+                                        isAnimationActive={false}
                                     />
 
                                     {/* Capacity Line */}
@@ -2286,7 +2296,7 @@ const AIPredictionTab: React.FC<AIPredictionTabProps> = ({ aiPrediction, aiLoadi
                             📅 Weekly Seasonality Pattern
                         </Typography>
                         {aiPrediction?.seasonality?.weekly?.length > 0 ? (
-                            <Box sx={{ height: { xs: 200, sm: 250 } }}>
+                            <Box sx={{ height: { xs: 200, sm: 250 }, overflow: 'hidden' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={aiPrediction.seasonality.weekly}>
                                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />

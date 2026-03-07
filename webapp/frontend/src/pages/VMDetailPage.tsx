@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import {
     Box,
     Card,
@@ -70,6 +71,7 @@ import {
     RestartAlt as RebootIcon,
     PowerSettingsNew as ShutdownIcon,
     MoreVert as MoreVertIcon,
+    Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -214,18 +216,28 @@ const formatThaiDateTime = (timestamp: string | Date) => {
 // Custom Tooltip สำหรับกราฟที่แสดงวันที่และเวลาแบบเต็ม
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-        // ดึง timestamp จาก payload
         const timestamp = payload[0]?.payload?.timestamp;
+        const color = payload[0]?.color || '#333';
         return (
-            <Paper sx={{ p: 1.5, border: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                    {timestamp ? formatThaiDateTime(timestamp) : label}
+            <Paper sx={{
+                p: 2,
+                borderLeft: `4px solid ${color}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                borderRadius: 2
+            }}>
+                <Typography variant="body2" fontWeight="bold" color="text.primary" sx={{ mb: 1, pb: 1, borderBottom: '1px solid #eee' }}>
+                    📅 {timestamp ? formatThaiDateTime(timestamp) : label}
                 </Typography>
                 {payload.map((entry: any, index: number) => (
-                    <Typography key={index} variant="body2" sx={{ color: entry.color }}>
-                        {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
-                        {entry.unit || ''}
-                    </Typography>
+                    <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 3, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: entry.color, display: 'inline-block' }}></span>
+                            {entry.name}
+                        </Typography>
+                        <Typography variant="subtitle2" fontWeight="bold" sx={{ color: entry.color }}>
+                            {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value} {entry.unit || ''}
+                        </Typography>
+                    </Box>
                 ))}
             </Paper>
         );
@@ -238,6 +250,7 @@ export default function VMDetailPage() {
     const { vmUuid } = useParams<{ vmUuid: string }>();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { user } = useAuthStore();
     const [activeTab, setActiveTab] = useState(0);
     const [timeRange, setTimeRange] = useState('7d'); // Default เป็น 7 วัน
     const [customDateOpen, setCustomDateOpen] = useState(false);
@@ -317,32 +330,32 @@ export default function VMDetailPage() {
             }
             return metricsApi.getVMHistory(vmUuid!, params);
         },
-        // โหลดเมื่ออยู่ใน Tab 1 (ประสิทธิภาพ) หรือ Tab 3 (ที่เก็บข้อมูล) เพื่อแสดงข้อมูล storage history
-        enabled: !!vmUuid && (activeTab === 1 || activeTab === 3) && (actualTimeRange !== 'custom' || (!!customStartDate && !!customEndDate)),
+        // โหลดเมื่ออยู่ใน Tab 1 (ประสิทธิภาพ), Tab 3 (ที่เก็บข้อมูล), หรือ Tab 7 (รายงาน) เพื่อแสดงข้อมูล storage history
+        enabled: !!vmUuid && (activeTab === 1 || activeTab === 3 || activeTab === 7) && (actualTimeRange !== 'custom' || (!!customStartDate && !!customEndDate)),
         staleTime: 1 * 60 * 1000, // 1 minute for metrics
         gcTime: 5 * 60 * 1000, // 5 minutes (renamed from cacheTime in v5)
     });
 
-    // ดึงข้อมูล Realtime จาก Sangfor API - โหลดเฉพาะเมื่ออยู่ Tab 0 หรือ Tab 1 เพื่อความเร็ว
+    // ดึงข้อมูล Realtime จาก Sangfor API - โหลดเฉพาะเมื่ออยู่ Tab 0, Tab 1 หรือ Tab 7 เพื่อความเร็ว
     const { data: realtimeData, isLoading: realtimeLoading } = useQuery({
         queryKey: ['vm-realtime', vmUuid],
         queryFn: () => metricsApi.getVMRealtime(vmUuid!),
-        enabled: !!vmUuid && (activeTab === 0 || activeTab === 1),
-        refetchInterval: activeTab === 0 || activeTab === 1 ? 30000 : false,
+        enabled: !!vmUuid && (activeTab === 0 || activeTab === 1 || activeTab === 7),
+        refetchInterval: (activeTab === 0 || activeTab === 1 || activeTab === 7) ? 30000 : false,
     });
 
     // ดึงข้อมูล Disks
     const { data: disksData, isLoading: disksLoading } = useQuery<{ data: VMDisk[] }>({
         queryKey: ['vm-disks', vmUuid],
         queryFn: () => vmsApi.getDisks(vmUuid!),
-        enabled: !!vmUuid && activeTab === 3,
+        enabled: !!vmUuid && (activeTab === 3 || activeTab === 7),
     });
 
     // ดึงข้อมูล Networks
     const { data: networksData, isLoading: networksLoading } = useQuery<{ data: VMNetwork[] }>({
         queryKey: ['vm-networks', vmUuid],
         queryFn: () => vmsApi.getNetworks(vmUuid!),
-        enabled: !!vmUuid && activeTab === 4,
+        enabled: !!vmUuid && (activeTab === 4 || activeTab === 7),
     });
 
     // ดึงข้อมูล Alarms & Platform Alerts
@@ -351,14 +364,14 @@ export default function VMDetailPage() {
     }>({
         queryKey: ['vm-alarms', vmUuid],
         queryFn: () => alarmsApi.getVmAlarms(vmUuid!),
-        enabled: !!vmUuid && activeTab === 6,
+        enabled: !!vmUuid && (activeTab === 6 || activeTab === 7),
     });
 
     // ดึงข้อมูล Raw Data
     const { data: rawData, isLoading: rawLoading, error: rawError } = useQuery({
         queryKey: ['vm-raw', vmUuid],
         queryFn: () => vmsApi.getRaw(vmUuid!),
-        enabled: !!vmUuid && activeTab === 7, // Load only when tab is active
+        enabled: !!vmUuid && activeTab === 8, // Load only when tab is active
     });
 
     const vm = vmData?.data;
@@ -369,9 +382,9 @@ export default function VMDetailPage() {
     const alarms = alarmsData?.data?.alarms || [];
     const platformAlerts = alarmsData?.data?.alerts || [];
 
-    // เตรียมข้อมูลกราฟ - คำนวณเมื่ออยู่ Tab 1 (ประสิทธิภาพ) หรือ Tab 3 (ที่เก็บข้อมูล)
+    // เตรียมข้อมูลกราฟ - คำนวณเมื่ออยู่ Tab 1 (ประสิทธิภาพ), Tab 3 (ที่เก็บข้อมูล) หรือ Tab 7 (รายงาน)
     const chartData = React.useMemo(() => {
-        if ((activeTab !== 1 && activeTab !== 3) || !metricsResponse?.series) return [];
+        if ((activeTab !== 1 && activeTab !== 3 && activeTab !== 7) || !metricsResponse?.series) return [];
 
         const cpuData = metricsResponse.series.cpu?.data || [];
         const memoryData = metricsResponse.series.memory?.data || [];
@@ -384,11 +397,17 @@ export default function VMDetailPage() {
 
         const timestampMap = new Map();
 
+        const isLongRange = actualTimeRange !== '1h' && actualTimeRange !== '6h' && actualTimeRange !== '24h';
+
         cpuData.forEach((item: any) => {
-            const time = new Date(item.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            const dateObj = new Date(item.timestamp);
+            const timeStr = isLongRange
+                ? `${dateObj.getDate()}/${dateObj.getMonth() + 1} ${dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`
+                : dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
             if (!timestampMap.has(item.timestamp)) {
                 timestampMap.set(item.timestamp, {
-                    time,
+                    time: timeStr,
                     timestamp: item.timestamp,
                     cpu: 0,
                     memory: 0,
@@ -475,9 +494,9 @@ export default function VMDetailPage() {
         (vm?.storage_used_mb && vm?.storage_total_mb ? (vm.storage_used_mb / vm.storage_total_mb) * 100 : 0)
     );
 
-    // คำนวณการเติบโตของ Storage - คำนวณเมื่ออยู่ Tab 1 หรือ Tab 3
+    // คำนวณการเติบโตของ Storage - คำนวณเมื่ออยู่ Tab 1, Tab 3 หรือ Tab 7
     const storageGrowth = React.useMemo(() => {
-        if ((activeTab !== 1 && activeTab !== 3) || chartData.length < 2) return { rate: 0, trend: 'stable', perDay: 0 };
+        if ((activeTab !== 1 && activeTab !== 3 && activeTab !== 7) || chartData.length < 2) return { rate: 0, trend: 'stable', perDay: 0 };
 
         const first = chartData[0].storageUsedMB || 0;
         const last = chartData[chartData.length - 1].storageUsedMB || 0;
@@ -1538,6 +1557,11 @@ export default function VMDetailPage() {
                                     )}
                                 </Box>
                             }
+                        />
+                        <Tab
+                            icon={<AssessmentIcon />}
+                            iconPosition="start"
+                            label="รายงาน"
                         />
                         <Tab
                             icon={<RawDataIcon />}
@@ -7325,9 +7349,630 @@ export default function VMDetailPage() {
                 </CardContent>
             </Card>
 
-            {/* Tab 7: Raw Data */}
+            {/* Tab 7: Report (รายงานแบบ Executive) */}
+            {activeTab === 7 && (
+                <Box
+                    className="report-container"
+                    sx={{
+                        '@media print': {
+                            backgroundColor: '#ffffff !important',
+                            color: '#000000 !important',
+                            position: 'static',
+                            width: '100%',
+                            m: 0,
+                            p: 0,
+                            '& *': {
+                                color: '#000000 !important',
+                                textShadow: 'none !important',
+                                boxShadow: 'none !important',
+                            },
+                        }
+                    }}
+                >
+                    <style type="text/css" media="print">
+                        {`
+                          @page { size: A4 portrait; margin: 15mm; }
+                          
+                          /* Reset EVERYTHING to allow multi-page printing */
+                          html, body, #root, main, .MuiBox-root, .MuiGrid-root {
+                              height: auto !important;
+                              min-height: auto !important;
+                              max-height: none !important;
+                              overflow: visible !important;
+                              position: static !important;
+                          }
+                          
+                          body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
+                          
+                          /* Hide all non-report UI elements */
+                          nav, aside, header, footer, .MuiDrawer-root, .MuiAppBar-root, .MuiTabs-root,
+                          .breadcrumb-container, .action-buttons, button { 
+                              display: none !important; 
+                          }
+                          
+                          /* Also hide the top VM header/title in the details page because the report has its own official header */
+                          /* We know it's the first Card in the VMDetailPage */
+                          .animate-fade-in > .MuiCard-root:first-of-type {
+                              display: none !important;
+                          }
+
+                          /* Ensure the report container takes full width and breaks correctly */
+                          .report-container { 
+                              display: block !important;
+                              width: 100% !important;
+                              margin: 0 !important;
+                              padding: 0 !important;
+                              visibility: visible !important;
+                          }
+                          
+                          /* Prevent cards/charts from being cut in half across pages */
+                          .MuiCard-root { page-break-inside: avoid !important; break-inside: avoid; border: 1px solid #aaa !important; box-shadow: none !important; border-radius: 4px !important; }
+                          .MuiGrid-item { page-break-inside: avoid !important; break-inside: avoid; }
+                          
+                          /* Chart Print Adjustments */
+                          .recharts-wrapper { background: #fff !important; }
+                          .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #ddd !important; }
+                          .MuiTypography-root { color: #000 !important; }
+                          
+                          /* Hide scrollbars */
+                          ::-webkit-scrollbar { display: none; }
+                        `}
+                    </style>
+                    {/* Header ของ Report */}
+                    <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        mb: 4,
+                        pb: 2,
+                        borderBottom: '3px solid',
+                        borderColor: 'primary.main',
+                        '@media print': { mb: 3, pb: 2, borderBottom: '3px solid #111' }
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                            <Box sx={{
+                                width: 56, height: 56, borderRadius: 2,
+                                background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)',
+                                '@media print': { background: '#222 !important', boxShadow: 'none !important' }
+                            }}>
+                                <AssessmentIcon sx={{ fontSize: 32, color: '#fff' }} />
+                            </Box>
+                            <Box>
+                                <Typography variant="h3" fontWeight="900" sx={{ color: 'text.primary', letterSpacing: '-0.5px', mb: 0.5, '@media print': { fontSize: '1.8rem', color: '#000 !important' } }}>
+                                    VM PERFORMANCE REPORT
+                                </Typography>
+                                <Typography variant="subtitle1" fontWeight="600" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '1px', '@media print': { color: '#444 !important' } }}>
+                                    รายงานอัจฉริยะสถานะระดับองค์กร
+                                </Typography>
+                            </Box>
+                        </Box>
+
+                        <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: 'text.primary', '@media print': { color: '#000 !important' } }}>
+                                วันที่ออกรายงาน: {new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' })} น.
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ '@media print': { color: '#444 !important' } }}>
+                                ช่วงเวลาข้อมูล: {timeRange === 'custom' ? `${customStartDate} ถึง ${customEndDate}` :
+                                    timeRange === '1h' ? 'ย้อนหลัง 1 ชั่วโมง' :
+                                        timeRange === '6h' ? 'ย้อนหลัง 6 ชั่วโมง' :
+                                            timeRange === '24h' ? 'ย้อนหลัง 24 ชั่วโมง' :
+                                                timeRange === '7d' ? 'ย้อนหลัง 7 วัน' :
+                                                    'ย้อนหลัง 30 วัน'}
+                            </Typography>
+                            <Chip
+                                size="small"
+                                label={`Cluster: ${vm.host_name || '-'}`}
+                                sx={{ mt: 1, alignSelf: 'flex-end', fontWeight: 600, borderRadius: 1.5, '@media print': { border: '1px solid #ccc' } }}
+                            />
+                        </Box>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }} className="action-buttons">
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={() => window.print()}
+                            sx={{
+                                '@media print': { display: 'none' },
+                                borderRadius: 2,
+                                px: 3
+                            }}
+                        >
+                            พิมพ์รายงาน (Print)
+                        </Button>
+                    </Box>
+
+                    {/* Section 1: ข้อมูลสรุป (Executive Summary) */}
+                    <Card sx={{
+                        mb: 3,
+                        borderRadius: 3,
+                        '@media print': {
+                            border: '1px solid #ccc',
+                            pageBreakInside: 'avoid',
+                            mb: 2
+                        }
+                    }}>
+                        <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+                            <Box sx={{ background: theme.palette.mode === 'dark' ? alpha('#fff', 0.05) : alpha('#000', 0.03), p: 1.5, borderBottom: '1px solid', borderColor: 'divider', '@media print': { background: '#f5f5f5 !important', borderBottom: '1px solid #777 !important' } }}>
+                                <Typography variant="subtitle1" fontWeight="bold" textTransform="uppercase">
+                                    I. ข้อมูลทั่วไปและระบุตัวตน (General Information)
+                                </Typography>
+                            </Box>
+
+                            {/* Form-like table structure using Grid */}
+                            <Grid container sx={{
+                                '& .MuiGrid-item': {
+                                    borderBottom: '1px solid', borderColor: 'divider', p: 1.5,
+                                    '@media print': { borderBottom: '1px solid #ddd !important', p: 1 }
+                                }
+                            }}>
+                                {/* Row 1 */}
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
+                                    <Typography variant="body2" color="text.secondary">ชื่อเครื่องเสมือน:</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4}>
+                                    <Typography variant="body1" fontWeight="bold">{vm.name}</Typography>
+                                </Grid>
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
+                                    <Typography variant="body2" color="text.secondary">รหัสอ้างอิง (UUID):</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4}>
+                                    <Typography variant="caption" fontFamily="monospace" color="text.disabled">{vm.vm_uuid}</Typography>
+                                </Grid>
+
+                                {/* Row 2 */}
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
+                                    <Typography variant="body2" color="text.secondary">สถานะปัจจุบัน:</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4}>
+                                    <Typography variant="body2" fontWeight="bold" color={vm.power_state === 'on' ? 'success.main' : 'error.main'} sx={{ '@media print': { color: '#000 !important' } }}>
+                                        {vm.power_state === 'on' ? '● กำลังทำงาน (Running)' : '○ หยุดทำงาน (Stopped)'}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
+                                    <Typography variant="body2" color="text.secondary">ระยะเวลาทำงาน:</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4}>
+                                    <Typography variant="body2" fontWeight="bold">{formatUptime(realtime?.uptime || vm.uptime_seconds, vm.power_state)}</Typography>
+                                </Grid>
+
+                                {/* Row 3 */}
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
+                                    <Typography variant="body2" color="text.secondary">ระบบปฏิบัติการ:</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <OSIcon osType={vm.os_type} osName={vm.os_name} size={16} />
+                                        <Typography variant="body2" fontWeight="bold">{vm.os_name || vm.os_type || 'Unknown OS'}</Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
+                                    <Typography variant="body2" color="text.secondary">IP Address / MAC:</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4}>
+                                    <Typography variant="body2" fontWeight="bold">
+                                        {vm.ip_address || (networks.length > 0 ? networks[0].ip_address : 'ไม่ระบุ')}
+                                        <Typography component="span" variant="caption" color="text.secondary">
+                                            {(vm.mac_address || (networks.length > 0 && networks[0].mac_address)) && ` (${vm.mac_address || networks[0].mac_address})`}
+                                        </Typography>
+                                    </Typography>
+                                </Grid>
+
+                                {/* Row 4 */}
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' }, borderBottom: 'none !important' }}>
+                                    <Typography variant="body2" color="text.secondary">กลุ่ม (Group/Project):</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4} sx={{ borderBottom: 'none !important' }}>
+                                    <Typography variant="body2" fontWeight="bold">{vm.group_name_path || vm.group_name || vm.project_name || 'ไม่ระบุ'}</Typography>
+                                </Grid>
+                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' }, borderBottom: 'none !important' }}>
+                                    <Typography variant="body2" color="text.secondary">สถานะการปกป้อง:</Typography>
+                                </Grid>
+                                <Grid item xs={8} sm={4} sx={{ borderBottom: 'none !important' }}>
+                                    <Typography variant="body2" fontWeight="bold">
+                                        {vm.protection_type ? `ได้รับการปกป้อง (${vm.protection_name || 'มี Backup'})` : 'ไม่มีการจัดการสำรองข้อมูล'}
+                                    </Typography>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
+
+                    {/* Section 2: การใช้งานทรัพยากรปัจจุบัน (Current Resource Utilization) */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>การใช้งานทรัพยากรปัจจุบัน (Current Utilization)</Typography>
+                        <Grid container spacing={3}>
+                            {/* CPU Card */}
+                            <Grid item xs={12} md={4}>
+                                <Card sx={{
+                                    height: '100%', borderRadius: 3,
+                                    background: theme.palette.mode === 'dark' ? alpha('#3b82f6', 0.1) : alpha('#3b82f6', 0.05),
+                                    border: `1px solid ${alpha('#3b82f6', 0.2)}`,
+                                    '@media print': { border: '1px solid #ccc', background: 'none !important' }
+                                }}>
+                                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, borderBottom: '1px solid', borderColor: 'divider', pb: 1, '@media print': { borderBottom: '1px solid #ddd !important' } }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <CpuIcon color="primary" sx={{ '@media print': { color: '#333 !important' } }} />
+                                                <Typography variant="subtitle1" fontWeight="bold">หน่วยประมวลผล (CPU)</Typography>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="h3" fontWeight="bold" sx={{ mb: 1, color: currentCpu > 80 ? 'error.main' : 'primary.main', '@media print': { color: '#000 !important' } }}>
+                                            {formatPercent(currentCpu / 100)}
+                                        </Typography>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={currentCpu}
+                                            color={currentCpu > 80 ? 'error' : 'primary'}
+                                            sx={{ height: 10, borderRadius: 1, mb: 1, '@media print': { '& .MuiLinearProgress-bar': { backgroundColor: currentCpu > 80 ? '#d32f2f !important' : '#333 !important' }, backgroundColor: '#e0e0e0 !important' } }}
+                                        />
+                                        <Typography variant="body2" color="text.secondary" align="right" sx={{ '@media print': { color: '#444 !important' } }}>
+                                            {vm.cpu_cores} Cores {vm.cpu_total_mhz ? `(${formatMhz(vm.cpu_total_mhz)})` : ''}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            {/* Memory Card */}
+                            <Grid item xs={12} md={4}>
+                                <Card sx={{
+                                    height: '100%', borderRadius: 3,
+                                    background: theme.palette.mode === 'dark' ? alpha('#8b5cf6', 0.1) : alpha('#8b5cf6', 0.05),
+                                    border: `1px solid ${alpha('#8b5cf6', 0.2)}`,
+                                    '@media print': { border: '1px solid #ccc', background: 'none !important' }
+                                }}>
+                                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, borderBottom: '1px solid', borderColor: 'divider', pb: 1, '@media print': { borderBottom: '1px solid #ddd !important' } }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <MemoryIcon sx={{ color: '#8b5cf6', '@media print': { color: '#333 !important' } }} />
+                                                <Typography variant="subtitle1" fontWeight="bold">หน่วยความจำ (Memory)</Typography>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="h3" fontWeight="bold" sx={{ mb: 1, color: currentMemory > 80 ? 'error.main' : '#8b5cf6', '@media print': { color: '#000 !important' } }}>
+                                            {formatPercent(currentMemory / 100)}
+                                        </Typography>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={currentMemory}
+                                            color={currentMemory > 80 ? 'error' : 'secondary'}
+                                            sx={{ height: 10, borderRadius: 1, mb: 1, '@media print': { '& .MuiLinearProgress-bar': { backgroundColor: currentMemory > 80 ? '#d32f2f !important' : '#333 !important' }, backgroundColor: '#e0e0e0 !important' } }}
+                                        />
+                                        <Typography variant="body2" color="text.secondary" align="right" sx={{ '@media print': { color: '#444 !important' } }}>
+                                            {formatBytes(vm.memory_used_mb)} / {formatBytes(vm.memory_total_mb)}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            {/* Storage Card */}
+                            <Grid item xs={12} md={4}>
+                                <Card sx={{
+                                    height: '100%', borderRadius: 3,
+                                    background: theme.palette.mode === 'dark' ? alpha('#10b981', 0.1) : alpha('#10b981', 0.05),
+                                    border: `1px solid ${alpha('#10b981', 0.2)}`,
+                                    '@media print': { border: '1px solid #ccc', background: 'none !important' }
+                                }}>
+                                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, borderBottom: '1px solid', borderColor: 'divider', pb: 1, '@media print': { borderBottom: '1px solid #ddd !important' } }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <StorageIcon sx={{ color: '#10b981', '@media print': { color: '#333 !important' } }} />
+                                                <Typography variant="subtitle1" fontWeight="bold">พื้นที่เก็บข้อมูล (Storage)</Typography>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="h3" fontWeight="bold" sx={{ mb: 1, color: currentStorage > 80 ? 'error.main' : '#10b981', '@media print': { color: '#000 !important' } }}>
+                                            {formatPercent(currentStorage / 100)}
+                                        </Typography>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={currentStorage}
+                                            color={currentStorage > 80 ? 'error' : 'success'}
+                                            sx={{ height: 10, borderRadius: 1, mb: 1, '@media print': { '& .MuiLinearProgress-bar': { backgroundColor: currentStorage > 80 ? '#d32f2f !important' : '#333 !important' }, backgroundColor: '#e0e0e0 !important' } }}
+                                        />
+                                        <Typography variant="body2" color="text.secondary" align="right" sx={{ mb: 0.5, '@media print': { color: '#444 !important' } }}>
+                                            {formatBytes(vm.storage_used_mb)} / {formatBytes(vm.storage_total_mb)}
+                                        </Typography>
+                                        {storageGrowth.perDay > 0 && (
+                                            <Typography variant="caption" display="block" color="text.secondary" align="right" sx={{ '@media print': { color: '#444 !important' } }}>
+                                                📈 แนวโน้มเพิ่มขึ้น ~{formatBytes(storageGrowth.perDay)}/วัน
+                                            </Typography>
+                                        )}
+                                        <Typography variant="caption" display="block" color="info.main" align="right" sx={{ '@media print': { color: '#444 !important' } }}>
+                                            Datastore: {vm.storage_name || 'ไม่ระบุ'}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+                    </Box>
+
+                    {/* Section 3: กราฟแนวโน้ม (Performance Trends) */}
+                    <Box sx={{
+                        mb: 3,
+                        '@media print': { pageBreakInside: 'avoid' }
+                    }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>แนวโน้มประสิทธิภาพ (Performance Trends)</Typography>
+                        {chartData.length > 0 ? (
+                            <Grid container spacing={3}>
+                                {/* Chart 1: CPU Usage */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', '@media print': { border: '1px solid #aaa !important', boxShadow: 'none !important', pageBreakInside: 'avoid', mb: 2 } }}>
+                                        <CardContent>
+                                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }} color="primary.main">1. CPU Usage (%)</Typography>
+                                            <Box sx={{ height: 230 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                        <defs>
+                                                            <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
+                                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                                        <XAxis
+                                                            dataKey="time"
+                                                            tick={{ fontSize: 11, fill: '#666' }}
+                                                            tickMargin={12}
+                                                            minTickGap={40}
+                                                            angle={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? -25 : 0}
+                                                            textAnchor={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? 'end' : 'middle'}
+                                                        />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#666' }} domain={[0, 100]} />
+                                                        <Tooltip content={<CustomTooltip />} />
+                                                        <Area isAnimationActive={false} type="monotone" dataKey="cpu" name="CPU" stroke="#3b82f6" strokeWidth={2} fill="url(#cpuGradient)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Chart 2: Memory Usage */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', '@media print': { border: '1px solid #aaa !important', boxShadow: 'none !important', pageBreakInside: 'avoid', mb: 2 } }}>
+                                        <CardContent>
+                                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: '#8b5cf6' }}>2. Memory Usage (%)</Typography>
+                                            <Box sx={{ height: 230 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                        <defs>
+                                                            <linearGradient id="memGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.6} />
+                                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                                        <XAxis
+                                                            dataKey="time"
+                                                            tick={{ fontSize: 11, fill: '#666' }}
+                                                            tickMargin={12}
+                                                            minTickGap={40}
+                                                            angle={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? -25 : 0}
+                                                            textAnchor={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? 'end' : 'middle'}
+                                                        />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#666' }} domain={[0, 100]} />
+                                                        <Tooltip content={<CustomTooltip />} />
+                                                        <Area isAnimationActive={false} type="monotone" dataKey="memory" name="Memory" stroke="#8b5cf6" strokeWidth={2} fill="url(#memGradient)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Chart 3: Network Traffic (In/Out) */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', '@media print': { border: '1px solid #aaa !important', boxShadow: 'none !important', pageBreakInside: 'avoid', mb: 2 } }}>
+                                        <CardContent>
+                                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: '#10b981' }}>3. Network Traffic (MB/s)</Typography>
+                                            <Box sx={{ height: 230 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                                        <XAxis
+                                                            dataKey="time"
+                                                            tick={{ fontSize: 11, fill: '#666' }}
+                                                            tickMargin={12}
+                                                            minTickGap={40}
+                                                            angle={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? -25 : 0}
+                                                            textAnchor={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? 'end' : 'middle'}
+                                                        />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#666' }} />
+                                                        <Tooltip content={<CustomTooltip />} />
+                                                        <Line isAnimationActive={false} type="monotone" dataKey="networkIn" name="In (MB/s)" stroke="#10b981" dot={false} strokeWidth={2.5} />
+                                                        <Line isAnimationActive={false} type="monotone" dataKey="networkOut" name="Out (MB/s)" stroke="#f59e0b" dot={false} strokeWidth={2.5} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Chart 4: Disk I/O (IOPS) */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', '@media print': { border: '1px solid #aaa !important', boxShadow: 'none !important', pageBreakInside: 'avoid', mb: 2 } }}>
+                                        <CardContent>
+                                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: '#0ea5e9' }}>4. Disk I/O (IOPS)</Typography>
+                                            <Box sx={{ height: 230 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                                        <XAxis
+                                                            dataKey="time"
+                                                            tick={{ fontSize: 11, fill: '#666' }}
+                                                            tickMargin={12}
+                                                            minTickGap={40}
+                                                            angle={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? -25 : 0}
+                                                            textAnchor={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? 'end' : 'middle'}
+                                                        />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#666' }} />
+                                                        <Tooltip content={<CustomTooltip />} />
+                                                        <Line isAnimationActive={false} type="monotone" dataKey="diskRead" name="Read IOPS" stroke="#0ea5e9" dot={false} strokeWidth={2.5} />
+                                                        <Line isAnimationActive={false} type="monotone" dataKey="diskWrite" name="Write IOPS" stroke="#ec4899" dot={false} strokeWidth={2.5} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Chart 5: Storage Area Size (GB) */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', '@media print': { border: '1px solid #aaa !important', boxShadow: 'none !important', pageBreakInside: 'avoid', mb: 2 } }}>
+                                        <CardContent>
+                                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: 'text.primary' }}>5. พื้นที่เก็บข้อมูล (Storage Used GB)</Typography>
+                                            <Box sx={{ height: 230 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                        <defs>
+                                                            <linearGradient id="storageSizeGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.6} />
+                                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                                        <XAxis
+                                                            dataKey="time"
+                                                            tick={{ fontSize: 11, fill: '#666' }}
+                                                            tickMargin={12}
+                                                            minTickGap={40}
+                                                            angle={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? -25 : 0}
+                                                            textAnchor={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? 'end' : 'middle'}
+                                                        />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#666' }} />
+                                                        <Tooltip content={<CustomTooltip />} />
+                                                        <Area isAnimationActive={false} type="monotone" dataKey="storageUsedGB" name="Used GB" stroke="#6366f1" strokeWidth={2} fill="url(#storageSizeGrad)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* Chart 6: Storage Usage (%) */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ height: '100%', borderRadius: 3, border: '1px solid', borderColor: 'divider', '@media print': { border: '1px solid #aaa !important', boxShadow: 'none !important', pageBreakInside: 'avoid', mb: 2 } }}>
+                                        <CardContent>
+                                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: 'text.primary' }}>6. เปอร์เซ็นต์การใช้พื้นที่ (Storage Usage %)</Typography>
+                                            <Box sx={{ height: 230 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                        <defs>
+                                                            <linearGradient id="storagePctGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.6} />
+                                                                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                                        <XAxis
+                                                            dataKey="time"
+                                                            tick={{ fontSize: 11, fill: '#666' }}
+                                                            tickMargin={12}
+                                                            minTickGap={40}
+                                                            angle={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? -25 : 0}
+                                                            textAnchor={actualTimeRange.endsWith('d') || actualTimeRange === 'custom' ? 'end' : 'middle'}
+                                                        />
+                                                        <YAxis tick={{ fontSize: 11, fill: '#666' }} domain={[0, 100]} />
+                                                        <Tooltip content={<CustomTooltip />} />
+                                                        <Area isAnimationActive={false} type="monotone" dataKey="storagePercent" name="Usage %" stroke="#14b8a6" strokeWidth={2} fill="url(#storagePctGrad)" />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        ) : (
+                            <Card sx={{ borderRadius: 3, p: 4, textAlign: 'center', '@media print': { display: 'none' } }}>
+                                {metricsLoading ? <CircularProgress /> : <Typography>ไม่มีข้อมูลช่วงเวลานี้</Typography>}
+                            </Card>
+                        )}
+                    </Box>
+
+                    {/* Section 4: ข้อมูลเครือข่ายและความปลอดภัย (Network & Security) */}
+                    <Box sx={{ '@media print': { pageBreakInside: 'avoid' } }}>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <Card sx={{ height: '100%', borderRadius: 3, '@media print': { border: '1px solid #ccc' } }}>
+                                    <CardContent>
+                                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <NetworkIcon color="primary" /> สรุปเครือข่ายและดิสก์ (Network & Disks)
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                            <Typography variant="body2">
+                                                <strong>เครือข่ายทั้งหมด:</strong> {networks.length} Interfaces
+                                                {networks.length > 0 && (
+                                                    <ul style={{ margin: '5px 0 0 20px', padding: 0 }}>
+                                                        {networks.map((n, i) => (
+                                                            <li key={i}>{n.ip_address || 'ไม่ระบุ IP'} {n.mac_address ? `(MAC: ${n.mac_address})` : ''}</li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>ดิสก์ทั้งหมด:</strong> {disks.length} Volumes (รวม {formatBytesWithMB(disks.reduce((acc, d) => acc + (d.size_mb || 0), 0))})
+                                                {disks.length > 0 && (
+                                                    <ul style={{ margin: '5px 0 0 20px', padding: 0 }}>
+                                                        {disks.map((d, i) => (
+                                                            <li key={i}>{d.storage_file || `Volume ${i + 1}`} ({formatBytesWithMB(d.size_mb || 0)})</li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </Typography>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Card sx={{ height: '100%', borderRadius: 3, '@media print': { border: '1px solid #ccc' } }}>
+                                    <CardContent>
+                                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <AlarmIcon color="error" /> การแจ้งเตือนความผิดปกติ (Alarms)
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Typography variant="h3" fontWeight="bold" color={alarms.length > 0 ? 'error.main' : 'success.main'} sx={{ '@media print': { color: '#000 !important' } }}>
+                                                {alarms.length}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" sx={{ '@media print': { color: '#444 !important' } }}>
+                                                แจ้งเตือนในช่วงเวลาที่เลือก <br />
+                                                {alarms.length > 0 ? 'ควรตรวจสอบ Log เพื่อหาสาเหตุ' : 'ทำงานปกติ ไม่มีข้อผิดพลาดที่รอดำเนินการ'}
+                                            </Typography>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+                    </Box>
+
+                    {/* Report Footer (Print Only) */}
+                    <Box sx={{
+                        display: 'none',
+                        mt: 4,
+                        pt: 2,
+                        borderTop: '1px solid #ccc',
+                        '@media print': {
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            pageBreakInside: 'avoid'
+                        }
+                    }}>
+                        <Typography variant="caption" sx={{ color: '#666 !important' }}>
+                            รายงานฉบับนี้ถูกรวบรวมและวิเคราะห์โดยระบบ VMStat Intelligence Center (Sangfor SCP)
+                        </Typography>
+                        <Box sx={{ textAlign: 'center', mt: 2 }}>
+                            <Typography variant="caption" sx={{ color: '#000 !important', display: 'block', mb: 3, fontWeight: 'bold' }}>
+                                พิมพ์โดย: {user?.username || 'System User'} / ผู้ตรวจสอบ (Signature)
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666 !important' }}>
+                                _________________________________________
+                            </Typography>
+                        </Box>
+                    </Box>
+                </Box>
+            )}
+
+            {/* Tab 8: Raw Data */}
             {
-                activeTab === 7 && (
+                activeTab === 8 && (
                     <Card>
                         <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
                             <Box>
