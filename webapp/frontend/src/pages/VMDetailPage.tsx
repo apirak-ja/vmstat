@@ -12,6 +12,7 @@ import {
     Tabs,
     Tab,
     Skeleton,
+    TableContainer,
     Table,
     TableBody,
     TableCell,
@@ -72,6 +73,7 @@ import {
     PowerSettingsNew as ShutdownIcon,
     MoreVert as MoreVertIcon,
     Assessment as AssessmentIcon,
+    Print as PrintIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -82,6 +84,7 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
+    Legend,
     ResponsiveContainer,
     Area,
     AreaChart,
@@ -7423,11 +7426,11 @@ export default function VMDetailPage() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'flex-start',
-                        mb: 4,
+                        mb: 3,
                         pb: 2,
                         borderBottom: '3px solid',
                         borderColor: 'primary.main',
-                        '@media print': { mb: 3, pb: 2, borderBottom: '3px solid #111' }
+                        '@media print': { mb: 2, pb: 2, borderBottom: '3px solid #111' }
                     }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
                             <Box sx={{
@@ -7440,48 +7443,47 @@ export default function VMDetailPage() {
                                 <AssessmentIcon sx={{ fontSize: 32, color: '#fff' }} />
                             </Box>
                             <Box>
-                                <Typography variant="h3" fontWeight="900" sx={{ color: 'text.primary', letterSpacing: '-0.5px', mb: 0.5, '@media print': { fontSize: '1.8rem', color: '#000 !important' } }}>
+                                <Typography variant="h4" fontWeight="900" sx={{ color: 'text.primary', letterSpacing: '-0.5px', mb: 0.5, '@media print': { fontSize: '1.6rem', color: '#000 !important' } }}>
                                     VM PERFORMANCE REPORT
                                 </Typography>
-                                <Typography variant="subtitle1" fontWeight="600" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '1px', '@media print': { color: '#444 !important' } }}>
-                                    รายงานอัจฉริยะสถานะระดับองค์กร
+                                <Typography variant="subtitle2" fontWeight="600" sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '1px', '@media print': { color: '#444 !important' } }}>
+                                    รายงานสถานะและการใช้งานเครื่องเสมือน
                                 </Typography>
                             </Box>
                         </Box>
 
-                        <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end' }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<PrintIcon />}
+                                onClick={() => window.print()}
+                                className="action-buttons"
+                                sx={{
+                                    '@media print': { display: 'none !important' },
+                                    borderRadius: 2, px: 3, mb: 1,
+                                    background: 'linear-gradient(135deg, #0ea5e9, #2563eb)',
+                                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                                    textTransform: 'none', fontWeight: 700,
+                                }}
+                            >
+                                พิมพ์รายงาน
+                            </Button>
                             <Typography variant="body2" fontWeight="bold" sx={{ color: 'text.primary', '@media print': { color: '#000 !important' } }}>
                                 วันที่ออกรายงาน: {new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' })} น.
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ '@media print': { color: '#444 !important' } }}>
+                                ผู้พิมพ์: {user?.username || 'System User'}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ '@media print': { color: '#444 !important' } }}>
                                 ช่วงเวลาข้อมูล: {timeRange === 'custom' ? `${customStartDate} ถึง ${customEndDate}` :
                                     timeRange === '1h' ? 'ย้อนหลัง 1 ชั่วโมง' :
                                         timeRange === '6h' ? 'ย้อนหลัง 6 ชั่วโมง' :
-                                            timeRange === '24h' ? 'ย้อนหลัง 24 ชั่วโมง' :
-                                                timeRange === '7d' ? 'ย้อนหลัง 7 วัน' :
-                                                    'ย้อนหลัง 30 วัน'}
+                                            timeRange === '12h' ? 'ย้อนหลัง 12 ชั่วโมง' :
+                                                timeRange === '24h' || timeRange === '1d' ? 'ย้อนหลัง 1 วัน' :
+                                                    timeRange === '7d' ? 'ย้อนหลัง 7 วัน' :
+                                                        'ย้อนหลัง 30 วัน'}
                             </Typography>
-                            <Chip
-                                size="small"
-                                label={`Cluster: ${vm.host_name || '-'}`}
-                                sx={{ mt: 1, alignSelf: 'flex-end', fontWeight: 600, borderRadius: 1.5, '@media print': { border: '1px solid #ccc' } }}
-                            />
                         </Box>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }} className="action-buttons">
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => window.print()}
-                            sx={{
-                                '@media print': { display: 'none' },
-                                borderRadius: 2,
-                                px: 3
-                            }}
-                        >
-                            พิมพ์รายงาน (Print)
-                        </Button>
                     </Box>
 
                     {/* Section 1: ข้อมูลสรุป (Executive Summary) */}
@@ -7500,82 +7502,96 @@ export default function VMDetailPage() {
                                     I. ข้อมูลทั่วไปและระบุตัวตน (General Information)
                                 </Typography>
                             </Box>
-
-                            {/* Form-like table structure using Grid */}
-                            <Grid container sx={{
-                                '& .MuiGrid-item': {
-                                    borderBottom: '1px solid', borderColor: 'divider', p: 1.5,
-                                    '@media print': { borderBottom: '1px solid #ddd !important', p: 1 }
-                                }
-                            }}>
-                                {/* Row 1 */}
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
-                                    <Typography variant="body2" color="text.secondary">ชื่อเครื่องเสมือน:</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4}>
-                                    <Typography variant="body1" fontWeight="bold">{vm.name}</Typography>
-                                </Grid>
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
-                                    <Typography variant="body2" color="text.secondary">รหัสอ้างอิง (UUID):</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4}>
-                                    <Typography variant="caption" fontFamily="monospace" color="text.disabled">{vm.vm_uuid}</Typography>
-                                </Grid>
-
-                                {/* Row 2 */}
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
-                                    <Typography variant="body2" color="text.secondary">สถานะปัจจุบัน:</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4}>
-                                    <Typography variant="body2" fontWeight="bold" color={vm.power_state === 'on' ? 'success.main' : 'error.main'} sx={{ '@media print': { color: '#000 !important' } }}>
-                                        {vm.power_state === 'on' ? '● กำลังทำงาน (Running)' : '○ หยุดทำงาน (Stopped)'}
-                                    </Typography>
-                                </Grid>
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
-                                    <Typography variant="body2" color="text.secondary">ระยะเวลาทำงาน:</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4}>
-                                    <Typography variant="body2" fontWeight="bold">{formatUptime(realtime?.uptime || vm.uptime_seconds, vm.power_state)}</Typography>
-                                </Grid>
-
-                                {/* Row 3 */}
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
-                                    <Typography variant="body2" color="text.secondary">ระบบปฏิบัติการ:</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <OSIcon osType={vm.os_type} osName={vm.os_name} size={16} />
-                                        <Typography variant="body2" fontWeight="bold">{vm.os_name || vm.os_type || 'Unknown OS'}</Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' } }}>
-                                    <Typography variant="body2" color="text.secondary">IP Address / MAC:</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4}>
-                                    <Typography variant="body2" fontWeight="bold">
-                                        {vm.ip_address || (networks.length > 0 ? networks[0].ip_address : 'ไม่ระบุ')}
-                                        <Typography component="span" variant="caption" color="text.secondary">
-                                            {(vm.mac_address || (networks.length > 0 && networks[0].mac_address)) && ` (${vm.mac_address || networks[0].mac_address})`}
-                                        </Typography>
-                                    </Typography>
-                                </Grid>
-
-                                {/* Row 4 */}
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' }, borderBottom: 'none !important' }}>
-                                    <Typography variant="body2" color="text.secondary">กลุ่ม (Group/Project):</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4} sx={{ borderBottom: 'none !important' }}>
-                                    <Typography variant="body2" fontWeight="bold">{vm.group_name_path || vm.group_name || vm.project_name || 'ไม่ระบุ'}</Typography>
-                                </Grid>
-                                <Grid item xs={4} sm={2} sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important', fontWeight: 'bold' }, borderBottom: 'none !important' }}>
-                                    <Typography variant="body2" color="text.secondary">สถานะการปกป้อง:</Typography>
-                                </Grid>
-                                <Grid item xs={8} sm={4} sx={{ borderBottom: 'none !important' }}>
-                                    <Typography variant="body2" fontWeight="bold">
-                                        {vm.protection_type ? `ได้รับการปกป้อง (${vm.protection_name || 'มี Backup'})` : 'ไม่มีการจัดการสำรองข้อมูล'}
-                                    </Typography>
-                                </Grid>
-                            </Grid>
+                            <TableContainer>
+                                <Table size="small" sx={{
+                                    '& .MuiTableCell-root': {
+                                        borderBottom: '1px solid', borderColor: 'divider', py: 1, px: 1.5,
+                                        '@media print': { borderBottom: '1px solid #ddd !important', py: 0.75 }
+                                    }
+                                }}>
+                                    <TableBody>
+                                        <TableRow>
+                                            <TableCell sx={{ width: '18%', bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">ชื่อเครื่องเสมือน:</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ width: '32%' }}>
+                                                <Typography variant="body2" fontWeight="bold">{vm.name}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ width: '18%', bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">รหัสอ้างอิง (UUID):</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ width: '32%' }}>
+                                                <Typography variant="caption" fontFamily="monospace" color="text.disabled">{vm.vm_uuid}</Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">สถานะปัจจุบัน:</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold" color={vm.power_state === 'on' ? 'success.main' : 'error.main'} sx={{ '@media print': { color: '#000 !important' } }}>
+                                                    {vm.power_state === 'on' ? '● กำลังทำงาน (Running)' : '○ หยุดทำงาน (Stopped)'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">ระยะเวลาทำงาน:</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">{formatUptime(realtime?.uptime || vm.uptime_seconds, vm.power_state)}</Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">ระบบปฏิบัติการ:</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <OSIcon osType={vm.os_type} osName={vm.os_name} size={16} />
+                                                    <Typography variant="body2" fontWeight="bold">{vm.os_name || vm.os_type || 'Unknown OS'}</Typography>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">IP Address:</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">
+                                                    {vm.ip_address || (networks.length > 0 ? networks[0].ip_address : 'ไม่ระบุ')}
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">โฮสต์ (Host):</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">{vm.host_name || 'ไม่ระบุ'}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">Datastore:</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">{vm.storage_name || 'ไม่ระบุ'}</Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">กลุ่ม (Group):</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">{vm.group_name_path || vm.group_name || vm.project_name || 'ไม่ระบุ'}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ bgcolor: theme.palette.mode === 'dark' ? alpha('#fff', 0.02) : alpha('#000', 0.01), '@media print': { bgcolor: '#fafafa !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600">สถานะการปกป้อง:</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">
+                                                    {vm.protection_type ? `🛡️ ได้รับการปกป้อง (${vm.protection_name || 'มี Backup'})` : '❌ ไม่มีการจัดการสำรองข้อมูล'}
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
                         </CardContent>
                     </Card>
 
@@ -7777,8 +7793,9 @@ export default function VMDetailPage() {
                                                         />
                                                         <YAxis tick={{ fontSize: 11, fill: '#666' }} />
                                                         <Tooltip content={<CustomTooltip />} />
-                                                        <Line isAnimationActive={false} type="monotone" dataKey="networkIn" name="In (MB/s)" stroke="#10b981" dot={false} strokeWidth={2.5} />
-                                                        <Line isAnimationActive={false} type="monotone" dataKey="networkOut" name="Out (MB/s)" stroke="#f59e0b" dot={false} strokeWidth={2.5} />
+                                                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                                                        <Line isAnimationActive={false} type="monotone" dataKey="networkIn" name="RX รับ (MB/s)" stroke="#10b981" dot={false} strokeWidth={2.5} />
+                                                        <Line isAnimationActive={false} type="monotone" dataKey="networkOut" name="TX ส่ง (MB/s)" stroke="#f59e0b" dot={false} strokeWidth={2.5} />
                                                     </LineChart>
                                                 </ResponsiveContainer>
                                             </Box>
@@ -7805,6 +7822,7 @@ export default function VMDetailPage() {
                                                         />
                                                         <YAxis tick={{ fontSize: 11, fill: '#666' }} />
                                                         <Tooltip content={<CustomTooltip />} />
+                                                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
                                                         <Line isAnimationActive={false} type="monotone" dataKey="diskRead" name="Read IOPS" stroke="#0ea5e9" dot={false} strokeWidth={2.5} />
                                                         <Line isAnimationActive={false} type="monotone" dataKey="diskWrite" name="Write IOPS" stroke="#ec4899" dot={false} strokeWidth={2.5} />
                                                     </LineChart>
@@ -7927,15 +7945,55 @@ export default function VMDetailPage() {
                                         <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                             <AlarmIcon color="error" /> การแจ้งเตือนความผิดปกติ (Alarms)
                                         </Typography>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                                             <Typography variant="h3" fontWeight="bold" color={alarms.length > 0 ? 'error.main' : 'success.main'} sx={{ '@media print': { color: '#000 !important' } }}>
                                                 {alarms.length}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary" sx={{ '@media print': { color: '#444 !important' } }}>
-                                                แจ้งเตือนในช่วงเวลาที่เลือก <br />
-                                                {alarms.length > 0 ? 'ควรตรวจสอบ Log เพื่อหาสาเหตุ' : 'ทำงานปกติ ไม่มีข้อผิดพลาดที่รอดำเนินการ'}
+                                                แจ้งเตือนทั้งหมด <br />
+                                                {alarms.length > 0 ? 'ควรตรวจสอบรายละเอียดด้านล่าง' : '✅ ทำงานปกติ ไม่มีข้อผิดพลาด'}
                                             </Typography>
                                         </Box>
+                                        {alarms.length > 0 && (
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                {alarms.slice(0, 10).map((alarm, idx) => (
+                                                    <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, p: 1, borderRadius: 1, bgcolor: theme.palette.mode === 'dark' ? alpha('#ef4444', 0.08) : alpha('#ef4444', 0.04), '@media print': { bgcolor: '#fef2f2 !important', border: '1px solid #fca5a5' } }}>
+                                                        <WarningIcon sx={{ fontSize: 16, color: 'warning.main', mt: 0.25, '@media print': { color: '#333 !important' } }} />
+                                                        <Box sx={{ flex: 1 }}>
+                                                            <Typography variant="body2" fontWeight="600" sx={{ lineHeight: 1.4 }}>
+                                                                {alarm.title || alarm.description || 'Unknown Alarm'}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {alarm.begin_time ? formatThaiDateTime(alarm.begin_time) : 'ไม่ระบุเวลา'}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                                {alarms.length > 10 && (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontStyle: 'italic' }}>
+                                                        ... และอีก {alarms.length - 10} รายการ
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        )}
+                                        {platformAlerts.length > 0 && (
+                                            <Box sx={{ mt: 2 }}>
+                                                <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>Platform Alerts ({platformAlerts.length})</Typography>
+                                                {platformAlerts.slice(0, 5).map((alert, idx) => (
+                                                    <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, p: 1, borderRadius: 1, mb: 0.5, bgcolor: theme.palette.mode === 'dark' ? alpha('#f59e0b', 0.08) : alpha('#f59e0b', 0.04), '@media print': { bgcolor: '#fffbeb !important', border: '1px solid #fcd34d' } }}>
+                                                        <InfoIcon sx={{ fontSize: 16, color: 'info.main', mt: 0.25, '@media print': { color: '#333 !important' } }} />
+                                                        <Box sx={{ flex: 1 }}>
+                                                            <Typography variant="body2" fontWeight="600" sx={{ lineHeight: 1.4 }}>
+                                                                {alert.title || alert.description || 'Platform Alert'}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {alert.begin_time ? formatThaiDateTime(alert.begin_time) : 'ไม่ระบุเวลา'}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        )}
                                     </CardContent>
                                 </Card>
                             </Grid>
