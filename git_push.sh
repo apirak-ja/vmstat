@@ -67,24 +67,38 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo -e "${GREEN}Files added successfully${NC}"
+# Check if there is anything staged to commit
+if git diff --cached --quiet; then
+    echo -e "${YELLOW}No new changes to commit — skipping commit step${NC}"
+else
+    echo -e "${GREEN}Files added successfully${NC}"
+    echo ""
+
+    # Commit
+    echo -e "${BLUE}Committing changes...${NC}"
+    git commit -m "${COMMIT_MSG}"
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to commit${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Committed successfully${NC}"
+fi
 echo ""
 
-# Commit
-echo -e "${BLUE}Committing changes...${NC}"
-git commit -m "${COMMIT_MSG}"
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: Failed to commit${NC}"
-    echo -e "${YELLOW}(This may be because there are no changes to commit)${NC}"
-    exit 1
+# Check if there is anything to push
+AHEAD=$(git rev-list --count origin/${CURRENT_BRANCH}..HEAD 2>/dev/null || echo "0")
+if [ "${AHEAD}" -eq 0 ]; then
+    echo -e "${YELLOW}Nothing to push — already up to date with origin/${CURRENT_BRANCH}${NC}"
+    echo ""
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}  Already up to date!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    exit 0
 fi
 
-echo -e "${GREEN}Committed successfully${NC}"
-echo ""
-
-# Push to remote
-echo -e "${BLUE}Pushing to remote repository...${NC}"
+echo -e "${BLUE}Pushing ${AHEAD} commit(s) to remote repository...${NC}"
 git push origin ${CURRENT_BRANCH}
 
 if [ $? -ne 0 ]; then
