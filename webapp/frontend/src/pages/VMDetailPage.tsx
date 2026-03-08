@@ -119,6 +119,7 @@ export default function VMDetailPage() {
     const [confirm, setConfirm] = useState<{ open: boolean; action: string, vmUuid: string, vmName: string, label: string }>({ open: false, action: '', vmUuid: '', vmName: '', label: '' });
     const [busy, setBusy] = useState(false);
     const [snack, setSnack] = useState<{ open: boolean; msg: string; ok: boolean }>({ open: false, msg: '', ok: true });
+    const [showReport, setShowReport] = useState(false);
 
     type VMAction = 'start' | 'stop' | 'shutdown' | 'reboot';
 
@@ -187,32 +188,32 @@ export default function VMDetailPage() {
             }
             return metricsApi.getVMHistory(vmUuid!, params);
         },
-        // โหลดเมื่ออยู่ใน Tab 1 (ประสิทธิภาพ), Tab 3 (ที่เก็บข้อมูล), หรือ Tab 7 (รายงาน) เพื่อแสดงข้อมูล storage history
-        enabled: !!vmUuid && (activeTab === 1 || activeTab === 3 || activeTab === 7) && (actualTimeRange !== 'custom' || (!!customStartDate && !!customEndDate)),
+        // โหลดเมื่ออยู่ใน Tab 1/3 หรือเปิดส่วนรายงาน เพื่อแสดงข้อมูล storage history
+        enabled: !!vmUuid && (activeTab === 1 || activeTab === 3 || showReport) && (actualTimeRange !== 'custom' || (!!customStartDate && !!customEndDate)),
         staleTime: 1 * 60 * 1000, // 1 minute for metrics
         gcTime: 5 * 60 * 1000, // 5 minutes (renamed from cacheTime in v5)
     });
 
-    // ดึงข้อมูล Realtime จาก Sangfor API - โหลดเฉพาะเมื่ออยู่ Tab 0, Tab 1 หรือ Tab 7 เพื่อความเร็ว
+    // ดึงข้อมูล Realtime จาก Sangfor API - โหลดเฉพาะแท็บที่ต้องใช้หรือเมื่อเปิดรายงาน
     const { data: realtimeData, isLoading: realtimeLoading } = useQuery({
         queryKey: ['vm-realtime', vmUuid],
         queryFn: () => metricsApi.getVMRealtime(vmUuid!),
-        enabled: !!vmUuid && (activeTab === 0 || activeTab === 1 || activeTab === 7),
-        refetchInterval: (activeTab === 0 || activeTab === 1 || activeTab === 7) ? 30000 : false,
+        enabled: !!vmUuid && (activeTab === 0 || activeTab === 1 || showReport),
+        refetchInterval: (activeTab === 0 || activeTab === 1 || showReport) ? 30000 : false,
     });
 
     // ดึงข้อมูล Disks
     const { data: disksData, isLoading: disksLoading } = useQuery<{ data: VMDisk[] }>({
         queryKey: ['vm-disks', vmUuid],
         queryFn: () => vmsApi.getDisks(vmUuid!),
-        enabled: !!vmUuid && (activeTab === 3 || activeTab === 7),
+        enabled: !!vmUuid && (activeTab === 3 || showReport),
     });
 
     // ดึงข้อมูล Networks
     const { data: networksData, isLoading: networksLoading } = useQuery<{ data: VMNetwork[] }>({
         queryKey: ['vm-networks', vmUuid],
         queryFn: () => vmsApi.getNetworks(vmUuid!),
-        enabled: !!vmUuid && (activeTab === 4 || activeTab === 7),
+        enabled: !!vmUuid && (activeTab === 4 || showReport),
     });
 
     // ดึงข้อมูล Alarms & Platform Alerts
@@ -221,14 +222,14 @@ export default function VMDetailPage() {
     }>({
         queryKey: ['vm-alarms', vmUuid],
         queryFn: () => alarmsApi.getVmAlarms(vmUuid!),
-        enabled: !!vmUuid && (activeTab === 6 || activeTab === 7),
+        enabled: !!vmUuid && (activeTab === 6 || showReport),
     });
 
     // ดึงข้อมูล Raw Data
     const { data: rawData, isLoading: rawLoading, error: rawError } = useQuery({
         queryKey: ['vm-raw', vmUuid],
         queryFn: () => vmsApi.getRaw(vmUuid!),
-        enabled: !!vmUuid && activeTab === 8, // Load only when tab is active
+        enabled: !!vmUuid && activeTab === 7, // Load only when tab is active
     });
 
     const vm = vmData?.data;
@@ -239,9 +240,9 @@ export default function VMDetailPage() {
     const alarms = alarmsData?.data?.alarms || [];
     const platformAlerts = alarmsData?.data?.alerts || [];
 
-    // เตรียมข้อมูลกราฟ - คำนวณเมื่ออยู่ Tab 1 (ประสิทธิภาพ), Tab 3 (ที่เก็บข้อมูล) หรือ Tab 7 (รายงาน)
+    // เตรียมข้อมูลกราฟ - คำนวณเมื่ออยู่ Tab 1/3 หรือเปิดส่วนรายงาน
     const chartData = React.useMemo(() => {
-        if ((activeTab !== 1 && activeTab !== 3 && activeTab !== 7) || !metricsResponse?.series) return [];
+        if ((activeTab !== 1 && activeTab !== 3 && !showReport) || !metricsResponse?.series) return [];
 
         const cpuData = metricsResponse.series.cpu?.data || [];
         const memoryData = metricsResponse.series.memory?.data || [];
@@ -326,9 +327,8 @@ export default function VMDetailPage() {
 
 
         return Array.from(timestampMap.values());
-    }, [metricsResponse, activeTab, vm?.storage_total_mb]);
+    }, [metricsResponse, activeTab, showReport, actualTimeRange, vm?.storage_total_mb]);
 
-    // คำนวณ % โดยใช้ค่าจริงจากฐานข้อมูล
     // คำนวณ % โดยใช้ค่าจริงจากฐานข้อมูล
     const currentCpu = normalizePercent(
         realtime?.cpu?.percent ||
@@ -351,9 +351,9 @@ export default function VMDetailPage() {
         (vm?.storage_used_mb && vm?.storage_total_mb ? (vm.storage_used_mb / vm.storage_total_mb) * 100 : 0)
     );
 
-    // คำนวณการเติบโตของ Storage - คำนวณเมื่ออยู่ Tab 1, Tab 3 หรือ Tab 7
+    // คำนวณการเติบโตของ Storage - คำนวณเมื่ออยู่ Tab 1/3 หรือเปิดรายงาน
     const storageGrowth = React.useMemo(() => {
-        if ((activeTab !== 1 && activeTab !== 3 && activeTab !== 7) || chartData.length < 2) return { rate: 0, trend: 'stable', perDay: 0 };
+        if ((activeTab !== 1 && activeTab !== 3 && !showReport) || chartData.length < 2) return { rate: 0, trend: 'stable', perDay: 0 };
 
         const first = chartData[0].storageUsedMB || 0;
         const last = chartData[chartData.length - 1].storageUsedMB || 0;
@@ -368,7 +368,7 @@ export default function VMDetailPage() {
         const trend = growth > 100 ? 'increasing' : growth < -100 ? 'decreasing' : 'stable';
 
         return { rate: growth, trend, perDay };
-    }, [chartData, activeTab]);
+    }, [chartData, activeTab, showReport]);
 
     const executeAction = async (action: VMAction) => {
         setBusy(true);
@@ -395,6 +395,16 @@ export default function VMDetailPage() {
         queryClient.invalidateQueries({ queryKey: ['vm-detail', vmUuid] });
         queryClient.invalidateQueries({ queryKey: ['vm-metrics-history', vmUuid] });
         queryClient.invalidateQueries({ queryKey: ['vm-realtime', vmUuid] });
+    };
+
+    const handlePrintReport = () => {
+        if (!showReport) {
+            setShowReport(true);
+            // Allow React to render Tab7Report into DOM before opening print dialog
+            window.setTimeout(() => window.print(), 800);
+        } else {
+            window.print();
+        }
     };
 
     const effectivePS = pendingState ?? vm?.power_state;
@@ -604,6 +614,27 @@ export default function VMDetailPage() {
 
                         {/* Action Buttons */}
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: { xs: 0.75, sm: 1 }, justifyContent: { xs: 'flex-start', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
+                            <Button
+                                startIcon={<AssessmentIcon sx={{ fontSize: { xs: 16, md: 20 } }} />}
+                                onClick={handlePrintReport}
+                                variant="contained"
+                                size="small"
+                                sx={{
+                                    borderRadius: { xs: 2, md: 2.5 },
+                                    textTransform: 'none',
+                                    fontWeight: 800,
+                                    fontSize: { xs: '0.75rem', sm: '0.8125rem', md: '0.875rem' },
+                                    px: { xs: 1.5, sm: 1.75, md: 2 },
+                                    py: { xs: 0.5, md: 0.75 },
+                                    minWidth: { xs: 'auto', sm: 'auto' },
+                                    background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                                    boxShadow: '0 6px 18px rgba(14, 165, 233, 0.45)',
+                                    '@media print': { display: 'none' },
+                                }}
+                            >
+                                พิมพ์รายงาน
+                            </Button>
+
                             <Button
                                 startIcon={<RefreshIcon sx={{ fontSize: { xs: 16, md: 20 } }} />}
                                 onClick={handleRefresh}
@@ -1416,11 +1447,6 @@ export default function VMDetailPage() {
                             }
                         />
                         <Tab
-                            icon={<AssessmentIcon />}
-                            iconPosition="start"
-                            label="รายงาน"
-                        />
-                        <Tab
                             icon={<RawDataIcon />}
                             iconPosition="start"
                             label="Raw Data"
@@ -1631,13 +1657,18 @@ export default function VMDetailPage() {
                 </CardContent>
             </Card>
 
-            {/* Tab 7: Report (รายงานแบบ Executive) - renders outside Card */}
-            {activeTab === 7 && (
-                <Tab7Report vm={vm} vmUuid={vmUuid!} theme={theme} metricsLoading={metricsLoading} realtimeLoading={realtimeLoading} disksLoading={disksLoading} networksLoading={networksLoading} alarmsLoading={alarmsLoading} chartData={chartData} realtime={realtime} disks={disks} networks={networks} alarms={alarms} platformAlerts={platformAlerts} currentCpu={currentCpu} currentMemory={currentMemory} currentStorage={currentStorage} storageGrowth={storageGrowth} timeRange={timeRange} actualTimeRange={actualTimeRange} user={user} customStartDate={customStartDate} customEndDate={customEndDate} />
+            {/* Print-only Report Section – hidden on screen, visible only during window.print() */}
+            {showReport && (
+                <Box
+                    id="vm-report-print-section"
+                    sx={{ display: 'none', '@media print': { display: 'block' } }}
+                >
+                    <Tab7Report vm={vm} vmUuid={vmUuid!} theme={theme} metricsLoading={metricsLoading} realtimeLoading={realtimeLoading} disksLoading={disksLoading} networksLoading={networksLoading} alarmsLoading={alarmsLoading} chartData={chartData} realtime={realtime} disks={disks} networks={networks} alarms={alarms} platformAlerts={platformAlerts} currentCpu={currentCpu} currentMemory={currentMemory} currentStorage={currentStorage} storageGrowth={storageGrowth} timeRange={timeRange} actualTimeRange={actualTimeRange} user={user} customStartDate={customStartDate} customEndDate={customEndDate} />
+                </Box>
             )}
 
-            {/* Tab 8: Raw Data - renders outside Card */}
-            {activeTab === 8 && (
+            {/* Tab 7: Raw Data - renders outside Card */}
+            {activeTab === 7 && (
                 <Tab8RawData vm={vm} vmUuid={vmUuid!} theme={theme} rawLoading={rawLoading} rawData={rawData} rawError={rawError} />
             )}
 

@@ -141,17 +141,23 @@ export default function Tab7Report(props: Tab7Props) {
             {/* ───── Print CSS ───── */}
             <style type="text/css">{`
                 @media print {
-                    @page { size: A4 portrait; margin: 12mm 14mm; }
-                    html, body, #root, main, .MuiBox-root, .MuiGrid-root {
-                        height: auto !important; min-height: auto !important;
-                        max-height: none !important; overflow: visible !important;
-                        position: static !important;
-                    }
+                    @page { size: A4 portrait; margin: 10mm 12mm; }
                     body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    nav, aside, .MuiDrawer-root, .MuiAppBar-root, .MuiTabs-root,
-                    .breadcrumb-container, .action-buttons, button { display: none !important; }
-                    .animate-fade-in > .MuiCard-root:first-of-type { display: none !important; }
-                    .report-container { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+                    html, body, #root { height: auto !important; overflow: visible !important; }
+
+                    /* Hide all page chrome and VM detail UI */
+                    nav, aside, header,
+                    .MuiDrawer-root, .MuiAppBar-root, .MuiTabs-root { display: none !important; }
+
+                    /* Hide VM detail sections: hero card, KPI grid, tabs card */
+                    .animate-fade-in > .MuiCard-root,
+                    .animate-fade-in > .MuiGrid-root { display: none !important; }
+
+                    /* Ensure the print-only report section is visible */
+                    #vm-report-print-section { display: block !important; }
+
+                    /* Report content print styles */
+                    .report-container { width: 100% !important; margin: 0 !important; padding: 0 !important; }
                     .MuiCard-root { page-break-inside: avoid !important; break-inside: avoid !important;
                         border: 1px solid #bbb !important; box-shadow: none !important; background: #fff !important; }
                     .MuiGrid-item { page-break-inside: avoid !important; break-inside: avoid !important; }
@@ -178,7 +184,7 @@ export default function Tab7Report(props: Tab7Props) {
                             boxShadow: '0 4px 14px rgba(14,165,233,0.35)',
                             '@media print': { background: '#1a3a6c !important', boxShadow: 'none !important' },
                         }}>
-                            <Typography sx={{ fontSize: '0.6rem', fontWeight: 900, color: '#fff', letterSpacing: '0.08em' }}>WUH</Typography>
+                            <Typography sx={{ fontSize: '0.6rem', fontWeight: 900, color: '#fff', letterSpacing: '0.08em' }}>VMR</Typography>
                             <AssessmentIcon sx={{ fontSize: 20, color: 'rgba(255,255,255,0.9)', mt: 0.2 }} />
                         </Box>
                         <Box>
@@ -235,7 +241,7 @@ export default function Tab7Report(props: Tab7Props) {
                     '@media print': { background: '#e8f4fd !important', borderRadius: '4px !important' },
                 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ '@media print': { color: '#333 !important' } }}>
-                        📅 ช่วงเวลาข้อมูล:
+                        ช่วงเวลาข้อมูล:
                     </Typography>
                     <Typography variant="body2" fontWeight="700" sx={{ '@media print': { color: '#000 !important' } }}>
                         {timeRangeLabel(timeRange, customStartDate, customEndDate)}
@@ -269,23 +275,21 @@ export default function Tab7Report(props: Tab7Props) {
                         }}>
                             <TableBody>
                                 {[
-                                    ['ชื่อเครื่องเสมือน (VM Name):', vm?.name, 'สถานะปัจจุบัน:', vm?.power_state === 'on' ? '🟢 กำลังทำงาน (Running)' : '🔴 หยุดทำงาน (Stopped)'],
+                                    ['ชื่อเครื่องเสมือน (VM Name):', vm?.name, 'สถานะปัจจุบัน:', vm?.power_state === 'on' ? 'กำลังทำงาน (Running)' : 'หยุดทำงาน (Stopped)'],
                                     ['รหัสอ้างอิง (UUID):', vm?.vm_uuid?.substring(0, 24) + '…', 'เวลาทำงานสะสม:', formatUptime(realtime?.uptime || vm?.uptime_seconds, vm?.power_state)],
                                     ['ระบบปฏิบัติการ (OS):', vm?.os_name || vm?.os_type || 'Unknown', 'IP Address:', vm?.ip_address || (networks.length > 0 ? networks[0].ip_address : 'ไม่ระบุ')],
                                     ['โฮสต์ (Host):', vm?.host_name || 'ไม่ระบุ', 'Datastore:', vm?.storage_name || 'ไม่ระบุ'],
-                                    ['กลุ่ม (Group / Project):', vm?.group_name_path || vm?.group_name || vm?.project_name || 'ไม่ระบุ', 'สถานะการปกป้อง:', vm?.protection_type ? `🛡️ ได้รับการปกป้อง${vm.backup_file_count ? ` (${vm.backup_file_count} ชุด)` : ''}` : '❌ ไม่มีการสำรองข้อมูล'],
+                                    ['กลุ่ม (Group / Project):', vm?.group_name_path || vm?.group_name || vm?.project_name || 'ไม่ระบุ', 'สถานะการปกป้อง:', vm?.protection_type ? `ได้รับการปกป้อง${vm.backup_file_count ? ` (${vm.backup_file_count} ชุด)` : ''}` : 'ไม่มีการสำรองข้อมูล'],
                                 ].map((row, i) => (
                                     <TableRow key={i} sx={{ bgcolor: i % 2 === 0 ? 'transparent' : (isDark ? alpha('#fff', 0.02) : alpha('#000', 0.015)) }}>
-                                        {[0, 2].map((ci) => (
-                                            <>
-                                                <TableCell key={ci} sx={{ width: '22%', bgcolor: isDark ? alpha('#fff', 0.03) : alpha('#000', 0.025), '@media print': { background: '#f5f5f5 !important' } }}>
-                                                    <Typography variant="body2" color="text.secondary" fontWeight="600" sx={{ '@media print': { color: '#444 !important' } }}>{row[ci]}</Typography>
-                                                </TableCell>
-                                                <TableCell key={ci + 1} sx={{ width: '28%' }}>
-                                                    <Typography variant="body2" fontWeight="bold" sx={{ wordBreak: 'break-all', '@media print': { color: '#000 !important' } }}>{row[ci + 1] as string}</Typography>
-                                                </TableCell>
-                                            </>
-                                        ))}
+                                        {[0, 2].map((ci) => [
+                                            <TableCell key={`k-${i}-${ci}`} sx={{ width: '22%', bgcolor: isDark ? alpha('#fff', 0.03) : alpha('#000', 0.025), '@media print': { background: '#f5f5f5 !important' } }}>
+                                                <Typography variant="body2" color="text.secondary" fontWeight="600" sx={{ '@media print': { color: '#444 !important' } }}>{row[ci]}</Typography>
+                                            </TableCell>,
+                                            <TableCell key={`v-${i}-${ci}`} sx={{ width: '28%' }}>
+                                                <Typography variant="body2" fontWeight="bold" sx={{ wordBreak: 'break-all', '@media print': { color: '#000 !important' } }}>{row[ci + 1] as string}</Typography>
+                                            </TableCell>,
+                                        ])}
                                     </TableRow>
                                 ))}
                                 {/* Hardware specs row */}
