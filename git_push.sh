@@ -36,6 +36,20 @@ if [ ! -d .git ]; then
     exit 1
 fi
 
+# Ensure correct remote (neostar-ja/vmstat)
+TARGET_REMOTE="https://github.com/neostar-ja/vmstat.git"
+# if origin exists and differs, update it; if not exist, add it
+if git remote | grep -q '^origin$'; then
+    CUR_URL=$(git remote get-url origin)
+    if [ "$CUR_URL" != "$TARGET_REMOTE" ]; then
+        echo -e "${YELLOW}Updating origin URL to ${TARGET_REMOTE}${NC}"
+        git remote set-url origin "$TARGET_REMOTE"
+    fi
+else
+    echo -e "${YELLOW}Adding origin remote pointing to ${TARGET_REMOTE}${NC}"
+    git remote add origin "$TARGET_REMOTE"
+fi
+
 # Show current branch
 CURRENT_BRANCH=$(git branch --show-current)
 echo -e "${GREEN}Current branch:${NC} ${YELLOW}${CURRENT_BRANCH}${NC}"

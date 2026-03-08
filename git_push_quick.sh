@@ -15,6 +15,19 @@ if [ -z "$1" ]; then
 fi
 
 COMMIT_MSG="$1"
+TARGET_REMOTE="https://github.com/neostar-ja/vmstat.git"
+# ensure origin points to correct repo
+if git remote | grep -q '^origin$'; then
+    CUR_URL=$(git remote get-url origin)
+    if [ "$CUR_URL" != "$TARGET_REMOTE" ]; then
+        echo "Updating origin URL to ${TARGET_REMOTE}"
+        git remote set-url origin "$TARGET_REMOTE"
+    fi
+else
+    echo "Adding origin remote ${TARGET_REMOTE}"
+    git remote add origin "$TARGET_REMOTE"
+fi
+
 CURRENT_BRANCH=$(git branch --show-current)
 
 echo "🚀 Quick Push to ${CURRENT_BRANCH}..."
