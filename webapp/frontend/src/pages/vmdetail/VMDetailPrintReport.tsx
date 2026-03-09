@@ -21,7 +21,7 @@ import type { Tab7Props } from './types';
 // ─── Chart dimensions ───────────────────────────────────────
 // Must be fixed pixels — no ResponsiveContainer
 const CW = 640; // chart width — full content width (1-column layout)
-const CH = 100; // chart height — taller for readability
+const CH = 78;  // chart height — keeps 6 charts within one A4 page
 
 // ─── Helper math ────────────────────────────────────────────
 const numAvg = (data: any[], key: string) =>
@@ -232,43 +232,6 @@ function SecHead({ num, title, sub, bgColor = '#1e293b' }: { num: string; title:
     );
 }
 
-// ─── Page footer (explicit page number per page) ────────────
-function PageFooter({ pageNum, totalPages, printDate, printTime, userName, year }: {
-    pageNum: number; totalPages: number;
-    printDate: string; printTime: string; userName: string; year: number;
-}) {
-    return (
-        <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            borderTop: '1.5px solid #cbd5e1',
-            padding: '7px 4mm',
-            backgroundColor: 'white',
-        }}>
-            {/* Left */}
-            <div>
-                <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>CONFIDENTIAL · For Internal Use Only · WUH VMStat</p>
-                <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>พิมพ์เมื่อ: {printDate} {printTime} น. · โดย: {userName}</p>
-            </div>
-            {/* Center — page number badge */}
-            <div style={{
-                display: 'flex', alignItems: 'baseline', gap: 3,
-                border: '1.5px solid #1a3560', borderRadius: 4,
-                padding: '3px 14px', backgroundColor: '#f8fafc',
-            }}>
-                <span style={{ fontSize: 8, color: '#64748b' }}>หน้า</span>
-                <span style={{ fontSize: 18, fontWeight: 900, color: '#1a3560', lineHeight: 1 }}>{pageNum}</span>
-                <span style={{ fontSize: 10, color: '#94a3b8' }}>/</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{totalPages}</span>
-            </div>
-            {/* Right */}
-            <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>เอกสารอ้างอิง: WUH-IT-VMRPT-{year}</p>
-                <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>Sangfor SCP VMStat © {year}</p>
-            </div>
-        </div>
-    );
-}
-
 // ─── Main component ──────────────────────────────────────────
 export default function VMDetailPrintReport(props: Tab7Props) {
     const {
@@ -313,10 +276,14 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                     .MuiTabs-root, .MuiTab-root { display: none !important; }
                     .animate-fade-in { display: none !important; }
 
-                    /* ── Report root ── */
-                    .vm-print-report { display: block !important; }
+                    /* ── Report root: pad top for fixed header, pad bottom for fixed footer ── */
+                    .vm-print-report {
+                        display: block !important;
+                        padding-top: 38px !important;
+                        padding-bottom: 52px !important;
+                    }
 
-                    /* ── Fixed running header — top of EVERY page ── */
+                    /* ── Fixed running header — top of EVERY physical page ── */
                     .print-rh {
                         position: fixed;
                         top: 0; left: 0; right: 0;
@@ -328,6 +295,25 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                         justify-content: space-between;
                         padding: 0 4mm;
                         z-index: 1000;
+                    }
+
+                    /* ── Fixed footer — bottom of EVERY physical page ── */
+                    .print-rf {
+                        position: fixed;
+                        bottom: 0; left: 0; right: 0;
+                        height: 46px;
+                        background: white;
+                        border-top: 1.5px solid #cbd5e1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 0 4mm;
+                        z-index: 1000;
+                    }
+
+                    /* ── CSS counter for automatic page number (Chrome updates per physical page) ── */
+                    .print-pgnum::before {
+                        content: counter(page);
                     }
 
                     /* ── Page break helpers ── */
@@ -344,9 +330,9 @@ export default function VMDetailPrintReport(props: Tab7Props) {
             {/* ── REPORT ROOT ── */}
             <div className="vm-print-report hidden print:block print:bg-white print:text-black font-sans text-sm w-full">
 
-                {/* ════════════════════════════════════════════
-                    FIXED RUNNING HEADER — appears on every page
-                    ════════════════════════════════════════════ */}
+                {/* ════════════════════════════════════════
+                    FIXED RUNNING HEADER — every physical page top
+                    ════════════════════════════════════════ */}
                 <div className="print-rh">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <img src="/vmstat/wuh_logo.png" alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }} />
@@ -361,10 +347,37 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                 </div>
 
                 {/* ════════════════════════════════════════
+                    FIXED FOOTER — every physical page bottom
+                    ════════════════════════════════════════ */}
+                <div className="print-rf">
+                    {/* Left */}
+                    <div>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>CONFIDENTIAL · For Internal Use Only · WUH VMStat</p>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>พิมพ์เมื่อ: {printDate} {printTime} น. · โดย: {userName}</p>
+                    </div>
+                    {/* Center — page number via CSS counter(page), updated per physical page by Chrome */}
+                    <div style={{
+                        display: 'flex', alignItems: 'baseline', gap: 3,
+                        border: '1.5px solid #1a3560', borderRadius: 4,
+                        padding: '2px 12px', backgroundColor: '#f8fafc',
+                    }}>
+                        <span style={{ fontSize: 8, color: '#64748b' }}>หน้า</span>
+                        <span className="print-pgnum" style={{ fontSize: 16, fontWeight: 900, color: '#1a3560', lineHeight: 1 }}></span>
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>/</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>3</span>
+                    </div>
+                    {/* Right */}
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>เอกสารอ้างอิง: WUH-IT-VMRPT-{YEAR}</p>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>Sangfor SCP VMStat © {YEAR}</p>
+                    </div>
+                </div>
+
+                {/* ════════════════════════════════════════
                     PAGE 1: Cover Header + Sections 1 & 2
                     ════════════════════════════════════════ */}
-                {/* paddingTop gives space below fixed running header */}
-                <div style={{ paddingTop: 38 }}>
+                {/* NOTE: paddingTop already comes from .vm-print-report rule above */}
+                <div>
 
                 {/* ── HEADER ── */}
                 <div className="mb-5 relative border-[1.5px] border-slate-300 rounded overflow-hidden">
@@ -542,12 +555,11 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                 </section>
 
                 </div>{/* /page-1 content */}
-                <PageFooter pageNum={1} totalPages={3} printDate={printDate} printTime={printTime} userName={userName} year={YEAR} />
 
                 {/* ════════════════════════════════════════
                     PAGE 2: Performance Charts (1-column)
                     ════════════════════════════════════════ */}
-                <div className="page-break-before" style={{ paddingTop: 38 }}>
+                <div className="page-break-before">
                     <SecHead
                         num="3"
                         title="ประสิทธิภาพการทำงาน (Performance Metrics)"
@@ -571,12 +583,11 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                         </div>
                     )}
                 </div>{/* /page-2 charts */}
-                <PageFooter pageNum={2} totalPages={3} printDate={printDate} printTime={printTime} userName={userName} year={YEAR} />
 
                 {/* ════════════════════════════════════════
                     PAGE 3: Health & Backup + Signatures
                     ════════════════════════════════════════ */}
-                <div className="page-break-before" style={{ paddingTop: 38 }}>
+                <div className="page-break-before">
 
                     {/* ── SECTION 4: Health & Backup ── */}
                     <section className="break-inside-avoid mb-5">
@@ -745,7 +756,6 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                     </section>
 
                 </div>{/* /page-3 */}
-                <PageFooter pageNum={3} totalPages={3} printDate={printDate} printTime={printTime} userName={userName} year={YEAR} />
 
             </div>{/* /vm-print-report */}
         </>
