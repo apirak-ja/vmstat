@@ -34,14 +34,35 @@ const numMax = (data: any[], key: string) =>
 
 const fmt = (v: number, unit = '') => `${v.toFixed(1)}${unit}`;
 
-const timeRangeLabel = (tr: string, cs: string, ce: string) => {
-    if (tr === 'custom') return `${cs} ถึง ${ce}`;
+const getTimeRangeData = (tr: string, cs: string, ce: string) => {
+    let label = '';
     const m: Record<string, string> = {
         '1h': '1 ชั่วโมงล่าสุด', '6h': '6 ชั่วโมงล่าสุด',
         '12h': '12 ชั่วโมงล่าสุด', '24h': '24 ชั่วโมงล่าสุด',
-        '1d': '24 ชั่วโมงล่าสุด', '7d': '7 วันล่าสุด', '30d': '30 วันล่าสุด',
+        '1d': '24 ชั่วโมงล่าสุด', '7d': '7 วัน', '30d': '30 วัน',
     };
-    return m[tr] || tr;
+    label = m[tr] || tr;
+    if (tr === 'custom') label = 'กำหนดเอง';
+
+    const start = new Date();
+    const end = new Date();
+    const fmtDateTime = (d: Date) => d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const fmtDateOnly = (d: Date) => d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    let range = '';
+    if (tr === 'custom') {
+        range = `${cs} - ${ce}`;
+    } else if (tr.endsWith('h')) {
+        start.setHours(end.getHours() - parseInt(tr));
+        range = `${fmtDateTime(start)} - ${fmtDateTime(end)}`;
+    } else if (tr.endsWith('d')) {
+        start.setDate(end.getDate() - parseInt(tr));
+        range = `${fmtDateOnly(start)} - ${fmtDateOnly(end)}`;
+    } else {
+        range = tr;
+    }
+
+    return { label, range };
 };
 
 const riskColor = (v: number, h = 80, m = 60) =>
@@ -229,61 +250,69 @@ export default function VMDetailPrintReport(props: Tab7Props) {
             <div className="vm-print-report hidden print:block print:bg-white print:text-black font-sans text-sm w-full">
 
                 {/* ═══════════════ HEADER ═══════════════ */}
-                <div className="mb-6">
+                <div className="mb-6 relative border-[1.5px] border-slate-300 rounded overflow-hidden">
                     {/* Top accent gradient bar */}
-                    <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #1a3560 0%, #2563eb 60%, #38bdf8 100%)' }} />
-                    <div className="border border-t-0 border-slate-300 px-5 py-4">
-                        <div className="flex items-center justify-between gap-4">
+                    <div className="h-1.5 w-full bg-slate-800" style={{ background: 'linear-gradient(90deg, #1a3560 0%, #2563eb 60%, #38bdf8 100%)' }} />
+                    <div className="px-5 py-4 bg-white">
+                        <div className="flex justify-between items-start">
                             {/* Left: logo + titles */}
-                            <div className="flex items-center gap-4 flex-shrink-0">
-                                <img src="/wuh_logo.png" alt="Logo"
-                                    style={{ height: 56, width: 'auto', maxWidth: 88, objectFit: 'contain' }} />
-                                <div className="border-l border-slate-300 pl-4">
-                                    <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">
-                                        Sangfor SCP · VMStat Intelligence Center
+                            <div className="flex gap-4">
+                                <div className="flex-shrink-0 flex items-center justify-center p-1.5 border border-slate-200 rounded bg-slate-50" style={{ width: 68, height: 68 }}>
+                                    <img src="/vmstat/wuh_logo.png" alt="Logo"
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                </div>
+                                <div className="flex flex-col justify-center">
+                                    <p className="text-[10px] font-bold tracking-widest text-[#1a3560] mb-0.5">
+                                        โรงพยาบาลศูนย์การแพทย์ มหาวิทยาลัยวลัยลักษณ์
                                     </p>
-                                    <h1 className="text-xl font-black text-slate-900 leading-tight tracking-tight">
-                                        VM SPECIFICATION &amp; STATUS REPORT
+                                    <h1 className="text-[22px] font-black text-[#0f172a] leading-tight tracking-tight uppercase">
+                                        VM Specification &amp; Status Report
                                     </h1>
-                                    <p className="text-[10px] text-slate-500 mt-0.5">
+                                    <p className="text-[11px] font-semibold text-slate-600 mt-0.5">
                                         รายงานข้อมูลจำเพาะและสถานะเครื่องเสมือน (VM Performance Assessment)
                                     </p>
                                 </div>
                             </div>
-                            {/* Right: classification stamp */}
-                            <div className="text-center flex-shrink-0">
-                                <div style={{
-                                    border: '2px solid #1a3560',
-                                    padding: '6px 14px',
-                                    display: 'inline-block',
-                                }}>
-                                    <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.2em', color: '#1a3560', textTransform: 'uppercase', margin: 0 }}>CONFIDENTIAL</p>
-                                    <p style={{ fontSize: 8, color: '#64748b', letterSpacing: '0.1em', margin: 0 }}>Internal Use Only</p>
+
+                            {/* Right: Info Box */}
+                            <div className="flex flex-col items-end gap-2 text-right">
+                                {/* Document Ref */}
+                                <div className="px-2.5 py-1.5 border border-slate-200 bg-slate-50 rounded shadow-sm">
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Document Ref.</p>
+                                    <p className="text-[11px] font-mono font-bold text-slate-700">WUH-IT-VMRPT-{new Date().getFullYear()}</p>
+                                </div>
+                                {/* Classification stamp */}
+                                <div className="border-[2px] border-[#1a3560] px-3 py-1 bg-white shadow-sm" style={{ transform: 'rotate(-2deg)' }}>
+                                    <p className="text-[10px] font-black tracking-[0.2em] text-[#1a3560] uppercase m-0 leading-tight">CONFIDENTIAL</p>
+                                    <p className="text-[8px] font-bold text-slate-500 tracking-[0.1em] text-center m-0">Internal Use Only</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* VM identity row */}
                         {vm && (
-                            <div className="mt-3 pt-3 border-t border-slate-200"
-                                style={{ display: 'flex', flexWrap: 'wrap', gap: '0 32px' }}>
-                                <div className="mr-6">
-                                    <p style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>VM Name</p>
-                                    <p style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', margin: 0 }}>{vm.name}</p>
+                            <div className="mt-5 grid grid-cols-4 border border-slate-200 rounded-md overflow-hidden bg-slate-50 shadow-inner">
+                                <div className="p-2.5 border-r border-slate-200">
+                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-1">VM Name</p>
+                                    <p className="text-sm font-black text-[#0f172a] truncate">{vm.name}</p>
                                 </div>
-                                <div className="mr-6">
-                                    <p style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>UUID</p>
-                                    <p style={{ fontSize: 10, fontFamily: 'monospace', color: '#475569', margin: 0 }}>{vm.vm_uuid}</p>
+                                <div className="p-2.5 border-r border-slate-200">
+                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-1">UUID</p>
+                                    <p className="text-[10px] font-mono font-bold text-slate-700 truncate">{vm.vm_uuid}</p>
                                 </div>
-                                <div className="mr-6">
-                                    <p style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Report Period</p>
-                                    <p style={{ fontSize: 11, fontWeight: 700, color: '#1e293b', margin: 0 }}>{timeRangeLabel(timeRange, customStartDate, customEndDate)}</p>
+                                <div className="p-2.5 border-r border-slate-200 flex flex-col justify-center">
+                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Report Period</p>
+                                    <p className="text-xs font-black text-[#1e293b] leading-tight">{getTimeRangeData(timeRange, customStartDate, customEndDate).label}</p>
+                                    <p className="text-[9px] font-mono font-bold text-slate-500 tracking-tight leading-tight">{getTimeRangeData(timeRange, customStartDate, customEndDate).range}</p>
                                 </div>
-                                <div>
-                                    <p style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Power Status</p>
-                                    <p style={{ fontSize: 11, fontWeight: 700, color: vm.power_state === 'on' ? '#16a34a' : '#c0392b', margin: 0 }}>
-                                        {vm.power_state === 'on' ? '● Running' : '● Stopped'}
-                                    </p>
+                                <div className="p-2.5 bg-[#f8fafc]">
+                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-1">Power Status</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <div className={`w-2.5 h-2.5 rounded-full ${vm.power_state === 'on' ? 'bg-green-500' : 'bg-red-500'} shadow-sm`} />
+                                        <p className={`text-xs font-black uppercase tracking-wide ${vm.power_state === 'on' ? 'text-green-700' : 'text-red-700'}`}>
+                                            {vm.power_state === 'on' ? 'RUNNING' : 'STOPPED'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -291,10 +320,10 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                 </div>
 
                 {/* ═══════════════ BODY SECTIONS ═══════════════ */}
-                <div className="space-y-5">
+                <div className="space-y-5" >
 
                     {/* ──────────── SECTION 1: General Information ──────────── */}
-                    <section className="break-inside-avoid">
+                    < section className="break-inside-avoid" >
                         <SecHead num="1" title="ข้อมูลทั่วไป (General Information)" bgColor="#1a3560" />
                         <div className="border border-slate-300 border-t-0">
                             {([
@@ -330,10 +359,10 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                                 </div>
                             ))}
                         </div>
-                    </section>
+                    </section >
 
                     {/* ──────────── SECTION 2: Resource Specifications ──────────── */}
-                    <section className="break-inside-avoid">
+                    < section className="break-inside-avoid" >
                         <SecHead num="2" title="ข้อมูลทรัพยากร (Resource Specifications)" bgColor="#155e75" />
                         <table className="w-full border-collapse text-xs border border-slate-300 border-t-0">
                             <thead>
@@ -408,93 +437,95 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                                 )}
                             </tbody>
                         </table>
-                    </section>
+                    </section >
 
                     {/* ──────────── SECTION 3: Performance Metrics (6 Charts) ──────────── */}
-                    <section>
+                    < section >
                         <SecHead
                             num="3"
                             title="ประสิทธิภาพการทำงาน (Performance Metrics)"
                             sub={chartData.length > 0
-                                ? `${timeRangeLabel(timeRange, customStartDate, customEndDate)} · ${chartData.length} Data Points`
+                                ? `${getTimeRangeData(timeRange, customStartDate, customEndDate).label} (${getTimeRangeData(timeRange, customStartDate, customEndDate).range}) · ${chartData.length} Data Points`
                                 : 'ไม่มีข้อมูลในช่วงเวลาที่เลือก'}
                             bgColor="#4c1d95"
                         />
-                        {chartData.length > 0 ? (
-                            <div className="flex flex-col gap-4 mt-2">
-                                <ChartCard
-                                    title="📊 1. CPU Usage (%)"
-                                    unit="%"
-                                    dataKey="cpu"
-                                    data={chartData}
-                                    color="#3b82f6"
-                                    label="CPU %"
-                                    kind="area"
-                                    domainMax={100}
-                                />
-                                <ChartCard
-                                    title="📊 2. Memory Usage (%)"
-                                    unit="%"
-                                    dataKey="memory"
-                                    data={chartData}
-                                    color="#8b5cf6"
-                                    label="Memory %"
-                                    kind="area"
-                                    domainMax={100}
-                                />
-                                <ChartCard
-                                    title="📈 3. Disk IOPS (Read / Write)"
-                                    unit=" IOPS"
-                                    dataKey="diskRead"
-                                    dataKey2="diskWrite"
-                                    data={chartData}
-                                    color="#0ea5e9"
-                                    color2="#ec4899"
-                                    label="Read"
-                                    label2="Write"
-                                    kind="line"
-                                />
-                                <ChartCard
-                                    title="📈 4. Storage Trend (GB Used)"
-                                    unit=" GB"
-                                    dataKey="storageUsedGB"
-                                    data={chartData}
-                                    color="#6366f1"
-                                    label="Used GB"
-                                    kind="area"
-                                />
-                                <ChartCard
-                                    title="🌐 5. Network Traffic (MB/s)"
-                                    unit=" MB/s"
-                                    dataKey="networkIn"
-                                    dataKey2="networkOut"
-                                    data={chartData}
-                                    color="#10b981"
-                                    color2="#f59e0b"
-                                    label="RX (In)"
-                                    label2="TX (Out)"
-                                    kind="line"
-                                />
-                                <ChartCard
-                                    title="⏱️ 6. Storage Usage (%)"
-                                    unit="%"
-                                    dataKey="storagePercent"
-                                    data={chartData}
-                                    color="#14b8a6"
-                                    label="Storage %"
-                                    kind="area"
-                                    domainMax={100}
-                                />
-                            </div>
-                        ) : (
-                            <div className="mt-2 border border-slate-200 rounded p-6 text-center text-slate-400 text-xs">
-                                ไม่มีข้อมูล Metrics — กรุณาเลือกช่วงเวลาก่อนพิมพ์รายงาน
-                            </div>
-                        )}
-                    </section>
+                        {
+                            chartData.length > 0 ? (
+                                <div className="flex flex-col gap-4 mt-2">
+                                    <ChartCard
+                                        title="📊 1. CPU Usage (%)"
+                                        unit="%"
+                                        dataKey="cpu"
+                                        data={chartData}
+                                        color="#3b82f6"
+                                        label="CPU %"
+                                        kind="area"
+                                        domainMax={100}
+                                    />
+                                    <ChartCard
+                                        title="📊 2. Memory Usage (%)"
+                                        unit="%"
+                                        dataKey="memory"
+                                        data={chartData}
+                                        color="#8b5cf6"
+                                        label="Memory %"
+                                        kind="area"
+                                        domainMax={100}
+                                    />
+                                    <ChartCard
+                                        title="📈 3. Disk IOPS (Read / Write)"
+                                        unit=" IOPS"
+                                        dataKey="diskRead"
+                                        dataKey2="diskWrite"
+                                        data={chartData}
+                                        color="#0ea5e9"
+                                        color2="#ec4899"
+                                        label="Read"
+                                        label2="Write"
+                                        kind="line"
+                                    />
+                                    <ChartCard
+                                        title="📈 4. Storage Trend (GB Used)"
+                                        unit=" GB"
+                                        dataKey="storageUsedGB"
+                                        data={chartData}
+                                        color="#6366f1"
+                                        label="Used GB"
+                                        kind="area"
+                                    />
+                                    <ChartCard
+                                        title="🌐 5. Network Traffic (MB/s)"
+                                        unit=" MB/s"
+                                        dataKey="networkIn"
+                                        dataKey2="networkOut"
+                                        data={chartData}
+                                        color="#10b981"
+                                        color2="#f59e0b"
+                                        label="RX (In)"
+                                        label2="TX (Out)"
+                                        kind="line"
+                                    />
+                                    <ChartCard
+                                        title="⏱️ 6. Storage Usage (%)"
+                                        unit="%"
+                                        dataKey="storagePercent"
+                                        data={chartData}
+                                        color="#14b8a6"
+                                        label="Storage %"
+                                        kind="area"
+                                        domainMax={100}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="mt-2 border border-slate-200 rounded p-6 text-center text-slate-400 text-xs">
+                                    ไม่มีข้อมูล Metrics — กรุณาเลือกช่วงเวลาก่อนพิมพ์รายงาน
+                                </div>
+                            )
+                        }
+                    </section >
 
                     {/* ──────────── SECTION 4: Health & Backup ──────────── */}
-                    <section className="break-inside-avoid">
+                    < section className="break-inside-avoid" >
                         <SecHead num="4" title="สถานะภาพรวม (Health & Backup Status)" bgColor="#78350f" />
                         <div className="border border-slate-300 border-t-0 divide-y divide-slate-200">
                             {/* Backup row */}
@@ -559,38 +590,48 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </section >
                 </div>
 
                 {/* ═══════════════ SIGNATURES ═══════════════ */}
-                <div className="mt-10 break-inside-avoid">
+                <div className="mt-6 break-inside-avoid" >
                     {/* Signature section header */}
-                    <div style={{ borderTop: '2px solid #1a3560', marginBottom: 16, paddingTop: 10 }}>
+                    <div style={{ borderTop: '2px solid #1a3560', marginBottom: 8, paddingTop: 6 }
+                    }>
                         <p style={{ fontSize: 9, fontWeight: 700, color: '#1a3560', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>
                             ลายมือชื่อผู้รับรอง / Authorization Signatures
                         </p>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24 }}>
+                    <div className="grid grid-cols-3 gap-6">
                         {([
                             { th: 'ผู้จัดทำ', en: 'Prepared By' },
                             { th: 'ผู้ตรวจสอบ', en: 'Reviewed By' },
                             { th: 'ผู้อนุมัติ', en: 'Approved By' },
                         ] as const).map(({ th, en }) => (
-                            <div key={en} style={{ border: '1px solid #cbd5e1', padding: '12px 14px', borderRadius: 2 }}>
-                                <p style={{ fontSize: 9, fontWeight: 700, color: '#1a3560', margin: '0 0 2px' }}>{en}</p>
-                                <p style={{ fontSize: 8, color: '#64748b', margin: '0 0 24px' }}>{th}</p>
-                                {/* Signature line */}
-                                <div style={{ borderBottom: '1.5px solid #64748b', marginBottom: 6, marginTop: 20 }} />
-                                <p style={{ fontSize: 8, color: '#94a3b8', margin: '0 0 4px' }}>ชื่อ / Name: ___________________________</p>
-                                <p style={{ fontSize: 8, color: '#94a3b8', margin: '0 0 4px' }}>ตำแหน่ง / Position: ___________________</p>
-                                <p style={{ fontSize: 8, color: '#94a3b8', margin: 0 }}>วันที่ / Date: _______ / _______ / _______</p>
+                            <div key={en} className="border border-slate-300 px-3 py-2 rounded-sm bg-white">
+                                <p className="text-[9px] font-bold text-[#1a3560] mb-0">{en}</p>
+                                <p className="text-[8px] text-slate-500 mb-6">{th}</p>
+
+                                <div className="border-b-[1.5px] border-slate-400 mb-4" />
+
+                                <div className="space-y-4">
+                                    <p className="text-[9px] text-slate-500 m-0 flex items-end">
+                                        <span className="w-16">ลายเซ็นต์ :</span> <span className="border-b border-dotted border-slate-400 flex-1"></span>
+                                    </p>
+                                    <p className="text-[9px] text-slate-500 m-0 flex items-end">
+                                        <span className="w-16">วันที่ :</span> <span className="border-b border-dotted border-slate-400 flex-1"></span>
+                                    </p>
+                                    <p className="text-[9px] text-slate-500 m-0 flex items-end">
+                                        <span className="w-16">ตำแหน่ง :</span> <span className="border-b border-dotted border-slate-400 flex-1"></span>
+                                    </p>
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
 
                 {/* ═══════════════ FOOTER ═══════════════ */}
-                <div className="mt-6 break-inside-avoid">
+                <div className="mt-4 break-inside-avoid" >
                     {/* Print info row */}
                     <div style={{
                         backgroundColor: '#f8fafc',
@@ -604,19 +645,19 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                     }}>
                         <div style={{ display: 'flex', gap: 24 }}>
                             <span style={{ fontSize: 9, color: '#64748b' }}>
-                                <span style={{ fontWeight: 700, color: '#334155' }}>วันที่พิมพ์ / Printed:</span>{' '}
-                                {printDate} · {printTime}
+                                <span style={{ fontWeight: 700, color: '#334155' }}>พิมพ์เมื่อ / Printed:</span>{' '}
+                                {printDate} เวลา {printTime} น.
                             </span>
                             <span style={{ fontSize: 9, color: '#64748b' }}>
                                 <span style={{ fontWeight: 700, color: '#334155' }}>ผู้พิมพ์ / Printed By:</span>{' '}
-                                {user?.username || 'Administrator'}
+                                {user?.first_name ? `${user.first_name} ${user.last_name || ''}` : (user?.username || 'Administrator')}
                             </span>
                             <span style={{ fontSize: 9, color: '#64748b' }}>
                                 <span style={{ fontWeight: 700, color: '#334155' }}>VM:</span>{' '}
                                 {vm?.name || '—'}
                             </span>
                         </div>
-                        <span style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'monospace' }}>Page 1 / 1</span>
+                        <span style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'monospace' }}>Page 1 / 3</span>
                     </div>
                     {/* Confidential strip */}
                     <div style={{
