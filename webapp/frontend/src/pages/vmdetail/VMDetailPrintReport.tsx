@@ -273,36 +273,29 @@ export default function VMDetailPrintReport(props: Tab7Props) {
 
                         /* Left: confidential + printed-by info */
                         @bottom-left {
-                            content: "CONFIDENTIAL · For Internal Use Only · WUH VMStat\A พิมพ์เมื่อ: ${printDate} ${printTime} น. · โดย: ${userName}";
+                            content: "CONFIDENTIAL · For Internal Use Only · WUH VMStat\\A พิมพ์เมื่อ: ${printDate} ${printTime} น. · โดย: ${userName}";
                             white-space: pre;
                             font-size: 7pt;
                             color: #94a3b8;
                             font-style: italic;
-                            vertical-align: top;
-                            padding-top: 2pt;
+                            vertical-align: middle;
                         }
-                        /* Center: page number badge */
+                        /* Center: page number — simple text, no border (margin boxes don't support border/bg reliably) */
                         @bottom-center {
-                            content: "หน้า " counter(page) " / 3";
-                            font-size: 12pt;
+                            content: "[ หน้า " counter(page) " / 3 ]";
+                            font-size: 9pt;
                             font-weight: 900;
                             color: #1a3560;
-                            border: 1.5pt solid #1a3560;
-                            border-radius: 3pt;
-                            padding: 2pt 14pt;
-                            background-color: #f8fafc;
-                            vertical-align: top;
-                            padding-top: 4pt;
+                            vertical-align: middle;
                         }
                         /* Right: document reference */
                         @bottom-right {
-                            content: "เอกสารอ้างอิง: WUH-IT-VMRPT-${YEAR}\A Sangfor SCP VMStat © ${YEAR}";
+                            content: "เอกสารอ้างอิง: WUH-IT-VMRPT-${YEAR}\\A Sangfor SCP VMStat © ${YEAR}";
                             white-space: pre;
                             font-size: 7pt;
                             color: #94a3b8;
-                            vertical-align: top;
+                            vertical-align: middle;
                             text-align: right;
-                            padding-top: 2pt;
                         }
                     }
 
