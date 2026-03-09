@@ -266,7 +266,46 @@ export default function VMDetailPrintReport(props: Tab7Props) {
             {/* ── Global print CSS ── */}
             <style>{`
                 @media print {
-                    @page { size: A4 portrait; margin: 14mm 12mm 16mm; }
+                    @page {
+                        size: A4 portrait;
+                        /* bottom margin is the footer area for @bottom-* boxes */
+                        margin: 14mm 12mm 20mm;
+
+                        /* Left: confidential + printed-by info */
+                        @bottom-left {
+                            content: "CONFIDENTIAL · For Internal Use Only · WUH VMStat\A พิมพ์เมื่อ: ${printDate} ${printTime} น. · โดย: ${userName}";
+                            white-space: pre;
+                            font-size: 7pt;
+                            color: #94a3b8;
+                            font-style: italic;
+                            vertical-align: top;
+                            padding-top: 2pt;
+                        }
+                        /* Center: page number badge */
+                        @bottom-center {
+                            content: "หน้า " counter(page) " / 3";
+                            font-size: 12pt;
+                            font-weight: 900;
+                            color: #1a3560;
+                            border: 1.5pt solid #1a3560;
+                            border-radius: 3pt;
+                            padding: 2pt 14pt;
+                            background-color: #f8fafc;
+                            vertical-align: top;
+                            padding-top: 4pt;
+                        }
+                        /* Right: document reference */
+                        @bottom-right {
+                            content: "เอกสารอ้างอิง: WUH-IT-VMRPT-${YEAR}\A Sangfor SCP VMStat © ${YEAR}";
+                            white-space: pre;
+                            font-size: 7pt;
+                            color: #94a3b8;
+                            vertical-align: top;
+                            text-align: right;
+                            padding-top: 2pt;
+                        }
+                    }
+
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     body { background: white !important; }
                     html, body, #root { height: auto !important; overflow: visible !important; }
@@ -276,14 +315,13 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                     .MuiTabs-root, .MuiTab-root { display: none !important; }
                     .animate-fade-in { display: none !important; }
 
-                    /* ── Report root: pad top for fixed header, pad bottom for fixed footer ── */
+                    /* Report root: pad top for fixed header only (footer is in @page margin) */
                     .vm-print-report {
                         display: block !important;
                         padding-top: 38px !important;
-                        padding-bottom: 52px !important;
                     }
 
-                    /* ── Fixed running header — top of EVERY physical page ── */
+                    /* Fixed running header — top of EVERY physical page */
                     .print-rh {
                         position: fixed;
                         top: 0; left: 0; right: 0;
@@ -297,31 +335,11 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                         z-index: 1000;
                     }
 
-                    /* ── Fixed footer — bottom of EVERY physical page ── */
-                    .print-rf {
-                        position: fixed;
-                        bottom: 0; left: 0; right: 0;
-                        height: 46px;
-                        background: white;
-                        border-top: 1.5px solid #cbd5e1;
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        padding: 0 4mm;
-                        z-index: 1000;
-                    }
-
-                    /* ── CSS counter for automatic page number (Chrome updates per physical page) ── */
-                    .print-pgnum::before {
-                        content: counter(page);
-                    }
-
-                    /* ── Page break helpers ── */
+                    /* Page break helpers */
                     .break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
-                    /* Force new page BEFORE page 2 and 3 sections */
                     .page-break-before { break-before: page !important; page-break-before: always !important; }
 
-                    /* ── Recharts ── */
+                    /* Recharts */
                     .recharts-wrapper, .recharts-surface { background: white !important; }
                     .recharts-cartesian-grid line { stroke: #e5e7eb !important; }
                 }
@@ -345,33 +363,7 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                         โรงพยาบาลศูนย์การแพทย์ มหาวิทยาลัยวลัยลักษณ์ · {printDate} {printTime} น.
                     </span>
                 </div>
-
-                {/* ════════════════════════════════════════
-                    FIXED FOOTER — every physical page bottom
-                    ════════════════════════════════════════ */}
-                <div className="print-rf">
-                    {/* Left */}
-                    <div>
-                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>CONFIDENTIAL · For Internal Use Only · WUH VMStat</p>
-                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>พิมพ์เมื่อ: {printDate} {printTime} น. · โดย: {userName}</p>
-                    </div>
-                    {/* Center — page number via CSS counter(page), updated per physical page by Chrome */}
-                    <div style={{
-                        display: 'flex', alignItems: 'baseline', gap: 3,
-                        border: '1.5px solid #1a3560', borderRadius: 4,
-                        padding: '2px 12px', backgroundColor: '#f8fafc',
-                    }}>
-                        <span style={{ fontSize: 8, color: '#64748b' }}>หน้า</span>
-                        <span className="print-pgnum" style={{ fontSize: 16, fontWeight: 900, color: '#1a3560', lineHeight: 1 }}></span>
-                        <span style={{ fontSize: 10, color: '#94a3b8' }}>/</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>3</span>
-                    </div>
-                    {/* Right */}
-                    <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>เอกสารอ้างอิง: WUH-IT-VMRPT-{YEAR}</p>
-                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>Sangfor SCP VMStat © {YEAR}</p>
-                    </div>
-                </div>
+                {/* Footer is rendered by @page margin boxes — no HTML element needed */}
 
                 {/* ════════════════════════════════════════
                     PAGE 1: Cover Header + Sections 1 & 2
