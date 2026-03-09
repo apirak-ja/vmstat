@@ -1,15 +1,14 @@
 /**
- * VMDetailPrintReport — Professional A4 Print Report (v2)
+ * VMDetailPrintReport — Professional A4 Print Report (v3)
  *
- * Structure: 3 logical pages separated by explicit CSS page breaks.
- *   Page 1 : Cover header + Section 1 (General Info) + Section 2 (Resources)
- *   Page 2 : Section 3 (Performance Charts)
- *   Page 3 : Section 4 (Health & Backup) + Authorization Signatures
+ * Layout strategy:
+ *   • position:fixed header (top:0) + footer (bottom:0) in @media print
+ *     → reliably pinned to every physical page regardless of content height
+ *   • CSS counter(page) in the fixed footer for auto page numbers X/3
+ *   • Simple break-before:page on section 3 and section 4 divs
+ *   • 2-column chart grid (3 rows × 2 cols) → halves chart-page height
  *
- * Each page has its own running header (p2/p3) and a footer with page number.
- *
- * Chart strategy: fixed pixel dimensions (CW × CH) — no ResponsiveContainer.
- * ResizeObserver returns 0 for display:none parents so fixed dims are required.
+ * Chart strategy: fixed pixel dimensions — no ResponsiveContainer.
  */
 
 import {
@@ -21,8 +20,8 @@ import type { Tab7Props } from './types';
 
 // ─── Chart dimensions ───────────────────────────────────────
 // Must be fixed pixels — no ResponsiveContainer
-const CW = 640; // full A4 content width at ~96dpi — 1-column layout
-const CH = 75;  // reduced so 6 charts fit in one print page (was 140)
+const CH = 90;  // chart height — fits comfortably in 2-col layout
+const CW2 = 306; // half-width for 2-column chart grid
 
 // ─── Helper math ────────────────────────────────────────────
 const numAvg = (data: any[], key: string) =>
@@ -81,11 +80,13 @@ interface ChartCardProps {
     label2?: string;
     kind?: 'area' | 'line';
     domainMax?: number;
+    w?: number; // override chart width (default CW2 for 2-col)
+    h?: number; // override chart height (default CH)
 }
 
-function ChartCard({ title, unit, dataKey, dataKey2, data, color, color2, label, label2, kind = 'area', domainMax }: ChartCardProps) {
+function ChartCard({ title, unit, dataKey, dataKey2, data, color, color2, label, label2, kind = 'area', domainMax, w = CW2, h = CH }: ChartCardProps) {
     const gradId = `pr-g-${dataKey}`;
-    const axisProps = { tick: { fontSize: 8, fill: '#6b7280' }, minTickGap: 40, tickMargin: 2 };
+    const axisProps = { tick: { fontSize: 7, fill: '#6b7280' }, minTickGap: 30, tickMargin: 2 };
     const yDomain: [number | string, number | string] = domainMax ? [0, domainMax] : ['auto', 'auto'];
 
     const minVal = numMin(data, dataKey);
@@ -118,7 +119,7 @@ function ChartCard({ title, unit, dataKey, dataKey2, data, color, color2, label,
             {/* Chart */}
             <div className="p-1 bg-white">
                 {kind === 'area' ? (
-                    <AreaChart width={CW} height={CH} data={data} margin={{ top: 4, right: 4, left: -18, bottom: 2 }}>
+                    <AreaChart width={w} height={h} data={data} margin={{ top: 4, right: 4, left: -18, bottom: 2 }}>
                         <defs>
                             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor={color} stopOpacity={0.4} />
@@ -133,7 +134,7 @@ function ChartCard({ title, unit, dataKey, dataKey2, data, color, color2, label,
                             stroke={color} strokeWidth={1.5} fill={`url(#${gradId})`} dot={false} />
                     </AreaChart>
                 ) : (
-                    <LineChart width={CW} height={CH} data={data} margin={{ top: 4, right: 4, left: -18, bottom: 2 }}>
+                    <LineChart width={w} height={h} data={data} margin={{ top: 4, right: 4, left: -18, bottom: 2 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                         <XAxis dataKey="time" {...axisProps} />
                         <YAxis tick={{ fontSize: 8, fill: '#6b7280' }} width={24} />
@@ -201,73 +202,6 @@ function SecHead({ num, title, sub, bgColor = '#1e293b' }: { num: string; title:
     );
 }
 
-// ─── Running header (page 2+) ─────────────────────────────────
-function RunningHeader({ vm, printDate, printTime }: { vm: any; printDate: string; printTime: string }) {
-    return (
-        <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            borderBottom: '2px solid #1a3560', marginBottom: 14, paddingBottom: 6,
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <img src="/vmstat/wuh_logo.png" alt="Logo" style={{ width: 22, height: 22, objectFit: 'contain' }} />
-                <div>
-                    <span style={{ fontSize: 8, fontWeight: 800, color: '#1a3560', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-                        VM Specification &amp; Status Report
-                    </span>
-                    <span style={{ fontSize: 8, color: '#64748b', marginLeft: 8 }}>· {vm?.name || '—'}</span>
-                </div>
-            </div>
-            <span style={{ fontSize: 8, color: '#94a3b8', fontStyle: 'italic' }}>
-                โรงพยาบาลศูนย์การแพทย์ มหาวิทยาลัยวลัยลักษณ์ · {printDate} {printTime} น.
-            </span>
-        </div>
-    );
-}
-
-// ─── Page footer with page number ────────────────────────────
-function PageFooter({ pageNum, totalPages, printDate, printTime, user }: {
-    pageNum: number; totalPages: number; vm?: any; printDate: string; printTime: string; user: any;
-}) {
-    const userName = user?.first_name
-        ? `${user.first_name} ${user.last_name || ''}`.trim()
-        : (user?.username || 'Administrator');
-    return (
-        <div style={{ marginTop: 18, paddingTop: 6, borderTop: '1px solid #cbd5e1' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                {/* Left */}
-                <div>
-                    <p style={{ fontSize: 8, color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>
-                        CONFIDENTIAL · For Internal Use Only · WUH VMStat
-                    </p>
-                    <p style={{ fontSize: 8, color: '#94a3b8', margin: 0 }}>
-                        พิมพ์เมื่อ: {printDate} เวลา {printTime} น. · โดย: {userName}
-                    </p>
-                </div>
-                {/* Page number badge */}
-                <div style={{
-                    display: 'flex', alignItems: 'baseline', gap: 4,
-                    border: '1.5px solid #1a3560', borderRadius: 4,
-                    padding: '3px 12px', backgroundColor: '#f8fafc',
-                }}>
-                    <span style={{ fontSize: 8, color: '#64748b', letterSpacing: '0.08em' }}>หน้า</span>
-                    <span style={{ fontSize: 16, fontWeight: 900, color: '#1a3560', lineHeight: 1 }}>{pageNum}</span>
-                    <span style={{ fontSize: 10, color: '#94a3b8' }}>/</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>{totalPages}</span>
-                </div>
-                {/* Right */}
-                <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: 8, color: '#94a3b8', margin: 0 }}>
-                        เอกสารอ้างอิง: WUH-IT-VMRPT-{new Date().getFullYear()}
-                    </p>
-                    <p style={{ fontSize: 8, color: '#94a3b8', margin: 0 }}>
-                        Sangfor SCP VMStat © {new Date().getFullYear()}
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ─── Main component ──────────────────────────────────────────
 export default function VMDetailPrintReport(props: Tab7Props) {
     const {
@@ -280,8 +214,6 @@ export default function VMDetailPrintReport(props: Tab7Props) {
     const printTime = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
     const totalAlarms = alarms.length + platformAlerts.length;
     const firstAlarm = alarms[0] || platformAlerts[0];
-    const TOTAL_PAGES = 3;
-
     const { label: trLabel, range: trRange } = getTimeRangeData(timeRange, customStartDate, customEndDate);
 
     // Recommendations
@@ -294,14 +226,17 @@ export default function VMDetailPrintReport(props: Tab7Props) {
     if (storageGrowth.perDay > 500 * 1024 * 1024) recs.push({ icon: 'ℹ', color: '#2563eb', text: `Storage เพิ่มขึ้น ~${formatBytes(storageGrowth.perDay)}/วัน — ควรวางแผนขยาย Storage` });
     if (recs.length === 0) recs.push({ icon: '✓', color: '#16a34a', text: 'ระบบทำงานปกติ ทรัพยากรทุกรายการอยู่ในระดับที่ยอมรับได้' });
 
-    const footerProps = { vm, printDate, printTime, user, totalPages: TOTAL_PAGES };
+    const userName = user?.first_name
+        ? `${user.first_name} ${user.last_name || ''}`.trim()
+        : (user?.username || 'Administrator');
+    const YEAR = new Date().getFullYear();
 
     return (
         <>
             {/* ── Global print CSS ── */}
             <style>{`
                 @media print {
-                    @page { size: A4 portrait; margin: 10mm 12mm 12mm; }
+                    @page { size: A4 portrait; margin: 14mm 12mm 16mm; }
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     body { background: white !important; }
                     html, body, #root { height: auto !important; overflow: visible !important; }
@@ -309,29 +244,106 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                     nav, aside, header, footer,
                     .MuiDrawer-root, .MuiAppBar-root,
                     .MuiTabs-root, .MuiTab-root { display: none !important; }
-
                     .animate-fade-in { display: none !important; }
-                    .vm-print-report { display: block !important; }
 
+                    /* ── Report root ── */
+                    .vm-print-report {
+                        display: block !important;
+                        padding-top: 38px !important;   /* space for fixed running header */
+                        padding-bottom: 52px !important; /* space for fixed footer */
+                    }
+
+                    /* ── Fixed running header — top of EVERY page ── */
+                    .print-rh {
+                        position: fixed;
+                        top: 0; left: 0; right: 0;
+                        height: 34px;
+                        background: white;
+                        border-bottom: 2px solid #1a3560;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 0 4mm;
+                        z-index: 1000;
+                    }
+
+                    /* ── Fixed footer — bottom of EVERY page ── */
+                    .print-rf {
+                        position: fixed;
+                        bottom: 0; left: 0; right: 0;
+                        height: 48px;
+                        background: white;
+                        border-top: 1.5px solid #cbd5e1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 0 4mm;
+                        z-index: 1000;
+                    }
+
+                    /* ── CSS page counter for page number ── */
+                    .print-pgnum::before { content: counter(page); }
+                    .print-pgtotal::before { content: "3"; }
+
+                    /* ── Page break helpers ── */
+                    .break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
+                    .page-start { break-before: page !important; page-break-before: always !important; }
+
+                    /* ── Recharts ── */
                     .recharts-wrapper, .recharts-surface { background: white !important; }
                     .recharts-cartesian-grid line { stroke: #e5e7eb !important; }
-
-                    .break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
-                    /* Each .print-page fills exactly one printed page; footer is anchored at the bottom */
-                    .print-page { display: flex !important; flex-direction: column !important; min-height: 100vh; break-after: page; page-break-after: always; }
-                    .print-page:last-child { break-after: auto !important; page-break-after: auto !important; }
-                    .print-page-content { flex: 1 !important; }
                 }
             `}</style>
 
             {/* ── REPORT ROOT ── */}
             <div className="vm-print-report hidden print:block print:bg-white print:text-black font-sans text-sm w-full">
 
-                {/* ═══════════════════════════════════════════════
-                    PAGE 1: Cover Header + General Info + Resources
-                    ═══════════════════════════════════════════════ */}
-                <div className="print-page">
-                <div className="print-page-content">
+                {/* ════════════════════════════════════════════
+                    FIXED RUNNING HEADER — appears on every page
+                    ════════════════════════════════════════════ */}
+                <div className="print-rh">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <img src="/vmstat/wuh_logo.png" alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }} />
+                        <span style={{ fontSize: 8, fontWeight: 800, color: '#1a3560', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                            VM Specification &amp; Status Report
+                        </span>
+                        <span style={{ fontSize: 8, color: '#64748b', marginLeft: 4 }}>· {vm?.name || '—'}</span>
+                    </div>
+                    <span style={{ fontSize: 8, color: '#94a3b8', fontStyle: 'italic' }}>
+                        โรงพยาบาลศูนย์การแพทย์ มหาวิทยาลัยวลัยลักษณ์ · {printDate} {printTime} น.
+                    </span>
+                </div>
+
+                {/* ════════════════════════════════════════════
+                    FIXED FOOTER — appears on every page
+                    ════════════════════════════════════════════ */}
+                <div className="print-rf">
+                    {/* Left */}
+                    <div>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0, fontStyle: 'italic' }}>CONFIDENTIAL · For Internal Use Only · WUH VMStat</p>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>พิมพ์เมื่อ: {printDate} {printTime} น. · โดย: {userName}</p>
+                    </div>
+                    {/* Center — page number via CSS counter */}
+                    <div style={{
+                        display: 'flex', alignItems: 'baseline', gap: 3,
+                        border: '1.5px solid #1a3560', borderRadius: 4,
+                        padding: '3px 14px', backgroundColor: '#f8fafc',
+                    }}>
+                        <span style={{ fontSize: 8, color: '#64748b' }}>หน้า</span>
+                        <span className="print-pgnum" style={{ fontSize: 18, fontWeight: 900, color: '#1a3560', lineHeight: 1 }} />
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>/</span>
+                        <span className="print-pgtotal" style={{ fontSize: 13, fontWeight: 700, color: '#334155' }} />
+                    </div>
+                    {/* Right */}
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>เอกสารอ้างอิง: WUH-IT-VMRPT-{YEAR}</p>
+                        <p style={{ fontSize: 7.5, color: '#94a3b8', margin: 0 }}>Sangfor SCP VMStat © {YEAR}</p>
+                    </div>
+                </div>
+
+                {/* ════════════════════════════════════════
+                    PAGE 1: Cover Header + Sections 1 & 2
+                    ════════════════════════════════════════ */}
 
                 {/* ── HEADER ── */}
                 <div className="mb-5 relative border-[1.5px] border-slate-300 rounded overflow-hidden">
@@ -508,17 +520,10 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                     </table>
                 </section>
 
-                </div>{/* /print-page-content p1 */}
-                {/* PAGE 1 FOOTER */}
-                <PageFooter pageNum={1} {...footerProps} />
-                </div>{/* /print-page p1 */}
-
-                {/* ═══════════════════════════════════════════════
-                    PAGE 2: Performance Charts
-                    ═══════════════════════════════════════════════ */}
-                <div className="print-page">
-                    <RunningHeader vm={vm} printDate={printDate} printTime={printTime} />
-                    <div className="print-page-content">
+                {/* ════════════════════════════════════════
+                    PAGE 2: Performance Charts (2-column grid)
+                    ════════════════════════════════════════ */}
+                <div className="page-start">
                     <SecHead
                         num="3"
                         title="ประสิทธิภาพการทำงาน (Performance Metrics)"
@@ -528,7 +533,7 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                         bgColor="#4c1d95"
                     />
                     {chartData.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
                             <ChartCard title="📊 1. CPU Usage (%)" unit="%" dataKey="cpu" data={chartData} color="#3b82f6" label="CPU %" kind="area" domainMax={100} />
                             <ChartCard title="📊 2. Memory Usage (%)" unit="%" dataKey="memory" data={chartData} color="#8b5cf6" label="Memory %" kind="area" domainMax={100} />
                             <ChartCard title="📈 3. Disk IOPS (Read / Write)" unit=" IOPS" dataKey="diskRead" dataKey2="diskWrite" data={chartData} color="#0ea5e9" color2="#ec4899" label="Read" label2="Write" kind="line" />
@@ -541,18 +546,12 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                             ไม่มีข้อมูล Metrics — กรุณาเลือกช่วงเวลาก่อนพิมพ์รายงาน
                         </div>
                     )}
-                    </div>{/* /print-page-content p2 */}
+                </div>{/* /page-start p2 */}
 
-                {/* PAGE 2 FOOTER */}
-                <PageFooter pageNum={2} {...footerProps} />
-                </div>{/* /print-page p2 */}
-
-                {/* ═══════════════════════════════════════════════
-                    PAGE 3: Health & Backup + Authorization Signatures
-                    ═══════════════════════════════════════════════ */}
-                <div className="print-page">
-                    <RunningHeader vm={vm} printDate={printDate} printTime={printTime} />
-                    <div className="print-page-content">
+                {/* ════════════════════════════════════════
+                    PAGE 3: Health & Backup + Signatures
+                    ════════════════════════════════════════ */}
+                <div className="page-start">
 
                     {/* ── SECTION 4: Health & Backup ── */}
                     <section className="break-inside-avoid mb-5">
@@ -720,12 +719,9 @@ export default function VMDetailPrintReport(props: Tab7Props) {
                         </div>
                     </section>
 
-                    </div>{/* /print-page-content p3 */}
-                    {/* PAGE 3 FOOTER */}
-                    <PageFooter pageNum={3} {...footerProps} />
-                </div>{/* /print-page p3 */}
+                </div>{/* /page-start p3 */}
 
-            </div>
+            </div>{/* /vm-print-report */}
         </>
     );
 }
